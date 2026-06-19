@@ -1,0 +1,220 @@
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"   # port API (dipakai Spark, Trino)
+      - "9001:9001"   # port konsol web (buat kamu buka di browser)
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  hive-postgres:
+    image: postgres:15
+    container_name: hive-postgres
+    environment:
+      POSTGRES_USER: ${HIVE_PG_USER}
+      POSTGRES_PASSWORD: ${HIVE_PG_PASSWORD}
+      POSTGRES_DB: ${HIVE_PG_DB}
+    volumes:
+      - hive_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HIVE_PG_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  hive-metastore:
+    image: apache/hive:4.0.0
+    container_name: hive-metastore
+    depends_on:
+      hive-postgres:
+        condition: service_healthy
+    ports:
+      - "9083:9083"
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: postgres
+      SERVICE_OPTS: "-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://hive-postgres:5432/metastore -Djavax.jdo.option.ConnectionUserName=${HIVE_PG_USER} -Djavax.jdo.option.ConnectionPassword=${HIVE_PG_PASSWORD}"
+    volumes:
+      - ./hive/metastore-site.xml:/opt/hive/conf/metastore-site.xml
+      - ./hive/lib/postgresql-42.7.4.jar:/opt/hive/lib/postgresql-42.7.4.jar
+      - ./hive/lib/hadoop-aws-3.3.6.jar:/opt/hadoop/share/hadoop/common/lib/hadoop-aws-3.3.6.jar
+      - ./hive/lib/aws-java-sdk-bundle-1.12.367.jar:/opt/hadoop/share/hadoop/common/lib/aws-java-sdk-bundle-1.12.367.jar
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: kafka
+    ports:
+      - "9092:9092"   # untuk koneksi dari laptopmu (script Python)
+      - "9094:9094"   # untuk koneksi antar container
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "controller,broker"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:9094"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://localhost:9092,INTERNAL://kafka:9094"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+  spark-master:
+    image: apache/spark:3.5.3
+    container_name: spark-master
+    user: root
+    ports:
+      - "8080:8080"   # Spark Master Web UI
+      - "7077:7077"   # Spark Master port (untuk worker & job)
+    environment:
+      SPARK_MODE: master
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    volumes:
+      - ./spark:/opt/spark/work-dir/app
+
+  spark-worker:
+    image: apache/spark:3.5.3
+    container_name: spark-worker
+    user: root
+    depends_on:
+      - spark-master
+    environment:
+      SPARK_MODE: worker
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    volumes:
+      - ./spark:/opt/spark/work-dir/app
+  trino:
+    image: trinodb/trino:455
+    container_name: trino
+    depends_on:
+      - hive-metastore
+      - minio
+    ports:
+      - "8081:8080"   # Trino Web UI & koneksi SQL (port host 8081 supaya tak bentrok Spark 8080)
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.17.2
+    container_name: mlflow
+    depends_on:
+      hive-postgres:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+    command: >
+      bash -c "pip install psycopg2-binary boto3 --quiet &&
+      mlflow server
+      --backend-store-uri postgresql://hive:hivepassword@hive-postgres:5432/mlflow
+      --default-artifact-root s3://mlflow/
+      --host 0.0.0.0 --port 5000"
+  airflow-init:
+    image: apache/airflow:2.10.3-python3.11
+    container_name: airflow-init
+    depends_on:
+      hive-postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://hive:hivepassword@hive-postgres:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    entrypoint: /bin/bash
+    command: -c "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true"
+  airflow-webserver:
+    image: apache/airflow:2.10.3-python3.11
+    container_name: airflow-webserver
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8082:8080"
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://hive:hivepassword@hive-postgres:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: webserver
+  airflow-scheduler:
+    image: apache/airflow:2.10.3-python3.11
+    container_name: airflow-scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://hive:hivepassword@hive-postgres:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: scheduler
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: trino-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+  superset-init:
+    image: apache/superset:4.1.1
+    container_name: superset-init
+    depends_on:
+      hive-postgres:
+        condition: service_healthy
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://hive:hivepassword@hive-postgres:5432/superset
+    entrypoint: /bin/bash
+    command: >
+      -c "pip install psycopg2-binary trino --quiet &&
+      superset db upgrade &&
+      superset fab create-admin --username admin --firstname Admin --lastname User --email admin@example.com --password admin &&
+      superset init"
+
+  superset:
+    image: apache/superset:4.1.1
+    container_name: superset
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://hive:hivepassword@hive-postgres:5432/superset
+    command: >
+      bash -c "pip install psycopg2-binary trino --quiet &&
+      gunicorn --bind 0.0.0.0:8088 --workers 2 --timeout 120 'superset.app:create_app()'"
+volumes:
+  minio_data:
+  hive_pg_data:
+  kafka_data:
+  grafana_data:
