@@ -181,6 +181,89 @@ docker compose down -v
 
 ---
 
+## Menjalankan Ingestion Pipeline (Ingestion Engineer)
+
+Setelah semua layanan Docker up (lihat langkah di atas), jalankan scraper dan Bronze ingest.
+
+### Prasyarat Python
+
+Pastikan Python tersedia. Install dependencies:
+
+```bash
+pip install feedparser kafka-python python-dotenv google-api-python-client twikit praw
+```
+
+### 1. Isi API Keys di `.env`
+
+Tambahkan baris berikut ke file `.env`:
+
+```env
+# YouTube Data API v3 (dari console.cloud.google.com)
+YOUTUBE_API_KEY=isi_api_key_kamu
+
+# Reddit (opsional, diblokir Kominfo - pipeline pakai data generate)
+REDDIT_CLIENT_ID=isi_nanti
+REDDIT_CLIENT_SECRET=isi_nanti
+REDDIT_USER_AGENT=surabaya-complaint-ews/1.0
+
+# X/Twitter (opsional - pipeline pakai data generate)
+X_USERNAME=isi_nanti
+X_EMAIL=isi_nanti
+X_PASSWORD=isi_nanti
+```
+
+### 2. Jalankan RSS Scraper → Kafka
+
+```bash
+cd ingestion
+python run_rss_to_kafka.py
+```
+
+Output: `Berhasil kirim N/N record ke topic 'raw-rss'`
+
+### 3. Jalankan Social Media Scraper → Kafka
+
+```bash
+python run_social_to_kafka.py
+```
+
+Output:
+- YouTube: N record → `raw-yt`
+- X (generated): 30 record → `raw-x`  
+- Reddit (generated): 20 record → `raw-reddit`
+
+> **Catatan:** X scraper terkendala Twikit GraphQL ID yang expired (known bug, bukan kesalahan implementasi). Reddit diblokir Kominfo. Keduanya digantikan data generate realistis berbasis template keluhan warga Surabaya.
+
+### 4. Jalankan Spark Bronze Ingest
+
+```bash
+docker compose exec spark-master /opt/spark/bin/spark-submit \
+  --packages io.delta:delta-spark_2.12:3.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,org.apache.hadoop:hadoop-aws:3.3.4 \
+  --conf spark.jars.ivy=/tmp/.ivy \
+  /opt/spark/work-dir/app/bronze_ingest.py
+```
+
+Biarkan berjalan beberapa menit. Cek MinIO di http://localhost:9001 → bucket `bronze` → folder `news_raw` harus muncul.
+
+Tekan `Ctrl+C` untuk stop setelah data masuk.
+
+### 5. Verifikasi
+
+Cek data di Kafka:
+```bash
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 --topic raw-rss --from-beginning --max-messages 2
+```
+
+Cek Bronze di MinIO: http://localhost:9001 → bucket `bronze` → `news_raw/`
+
+### Airflow DAG
+
+DAG `daily_scraping_dag` sudah terdaftar dan terjadwal otomatis jam 06.00 WIB setiap hari.
+Akses Airflow UI: http://localhost:8082 (admin/admin)
+
+---
+
 ## Struktur Folder
 
 ```
@@ -193,8 +276,21 @@ surabaya-complaint-ews/
 │   └── lib/                # Driver JAR (TIDAK di-commit, unduh manual)
 ├── kafka/                  # Script setup topik
 ├── trino/catalog/          # Konfigurasi koneksi Trino (delta.properties)
-├── spark/                  # Script Spark + tes
-├── airflow/dags/           # 4 DAG (kerangka): scraping, etl, llm, retrain
+├── spark/                  # Script Spark + tes (bronze_ingest.py dll)
+├── airflow/dags/           # 4 DAG: scraping, etl, llm, retrain
+├── ingestion/              # ← INGESTION ENGINEER
+│   ├── run_rss_to_kafka.py         # Entry point RSS → Kafka
+│   ├── run_social_to_kafka.py      # Entry point YouTube/X/Reddit → Kafka
+│   ├── scrapers/
+│   │   ├── base_scraper.py         # Base class semua scraper
+│   │   ├── rss_scraper.py          # Scraper RSS berita lokal
+│   │   ├── sources_config.py       # Konfigurasi semua sumber & keywords
+│   │   └── social_media/
+│   │       ├── youtube_scraper.py  # YouTube Data API v3
+│   │       ├── x_scraper.py        # X/Twitter via Twikit (cookie-based)
+│   │       ├── reddit_scraper.py   # Reddit via PRAW (opsional)
+│   │       └── generate_scraper.py # Data generate X & Reddit (fallback)
+│   └── requirements.txt
 ├── superset/               # Export dashboard
 ├── grafana/                # Dashboard alerting
 ├── data/                   # GeoJSON kecamatan, labeled samples
@@ -205,10 +301,10 @@ surabaya-complaint-ews/
 
 ## Pembagian Peran Tim
 
-| Role | Tanggung Jawab |
-|---|---|
-| **Infrastructure** | Docker, Kafka, MinIO, Trino, Hive, Airflow, MLflow (repo ini) |
-| Ingestion Engineer | Scraper (RSS/X/Reddit/YouTube) -> Kafka -> Bronze |
-| ML Engineer | Labeling, Silver NLP, 4 model Spark MLlib, MLflow |
-| Pipeline + LLM | Gold agregasi, LLM enrichment, integrasi, Airflow ETL DAG |
-| Visualization | Superset dashboard, Grafana alerting, slide, dokumentasi |
+| Role | Tanggung Jawab | Status |
+|---|---|---|
+| **Infrastructure** | Docker, Kafka, MinIO, Trino, Hive, Airflow, MLflow | ✅ Done |
+| **Ingestion Engineer** | Scraper (RSS/YouTube/X/Reddit) → Kafka → Bronze Delta Lake | ✅ Done |
+| ML Engineer | Labeling, Silver NLP, 4 model Spark MLlib, MLflow | 🔄 In Progress |
+| Pipeline + LLM | Gold agregasi, LLM enrichment, integrasi, Airflow ETL DAG | 🔄 In Progress |
+| Visualization | Superset dashboard, Grafana alerting, slide, dokumentasi | 🔄 In Progress |
