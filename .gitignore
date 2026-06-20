@@ -1,0 +1,25 @@
+# Secrets - JANGAN pernah di-commit
+.env
+
+# JAR files (besar, di-download ulang via script)
+hive/lib/*.jar
+
+# Spark scratch / cache
+spark/spark-warehouse/
+**/.ivy/
+
+# OS & editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Sensitive scraper files
+ingestion/scrapers/social_media/x_cookies.json
+ingestion/scrapers/social_media/__pycache__/
