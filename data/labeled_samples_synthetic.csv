@@ -1,0 +1,36 @@
+id,clean_text,category,importance_label,urgency_label,kecamatan
+1,Air PDAM di rumah saya sudah 3 hari tidak mengalir padahal sudah bayar tagihan tepat waktu,Air,tinggi,tinggi,Sukolilo
+2,Kualitas air sumur warga keruh dan berbau sejak ada pembangunan di sekitar gang,Air,tinggi,rendah,Gubeng
+3,Tekanan air PDAM kecil sekali tiap sore hari susah buat mandi,Air,rendah,rendah,Wonokromo
+4,Sudah lapor kebocoran pipa air di depan rumah tapi belum ada tindak lanjut dari minggu lalu,Air,tinggi,tinggi,Tegalsari
+5,Air keran di sekolah negeri kami tidak layak minum warnanya kekuningan,Air,tinggi,rendah,Rungkut
+6,Sampah menumpuk di TPS sudah seminggu tidak diangkut baunya menyengat sampai ke rumah warga,Sampah,tinggi,tinggi,Sukolilo
+7,Tong sampah di taman kota sudah penuh dan berserakan ke jalan,Sampah,rendah,rendah,Gubeng
+8,Petugas kebersihan tidak datang ambil sampah rumah tangga selama 4 hari,Sampah,tinggi,tinggi,Wonokromo
+9,Banyak warga buang sampah sembarangan di sungai bikin got mampet,Sampah,rendah,rendah,Tegalsari
+10,TPS liar muncul di pinggir jalan raya mengganggu pemandangan dan bau tidak sedap,Sampah,rendah,rendah,Rungkut
+11,Jalan berlubang besar di depan pasar sudah memakan korban pengendara motor jatuh,Jalan,tinggi,tinggi,Sukolilo
+12,Aspal jalan retak-retak di beberapa titik perlu perbaikan segera sebelum musim hujan,Jalan,tinggi,rendah,Gubeng
+13,Trotoar rusak parah pejalan kaki harus turun ke jalan raya yang ramai kendaraan,Jalan,tinggi,tinggi,Wonokromo
+14,Marka jalan sudah pudar susah dilihat malam hari rawan kecelakaan,Jalan,rendah,rendah,Tegalsari
+15,Jalan kampung becek dan berlumpur tiap kali hujan turun,Jalan,rendah,rendah,Rungkut
+16,Listrik padam total sudah 6 jam tanpa pemberitahuan dari PLN bikin warga resah,Listrik,tinggi,tinggi,Sukolilo
+17,Tiang listrik miring hampir roboh di dekat pemukiman warga sangat membahayakan,Listrik,tinggi,tinggi,Gubeng
+18,Kabel listrik menjuntai rendah di jalan raya berbahaya buat pengendara,Listrik,tinggi,tinggi,Wonokromo
+19,Lampu jalan mati total di beberapa ruas jalan membuat suasana gelap dan rawan kejahatan,Listrik,rendah,rendah,Tegalsari
+20,Tagihan listrik melonjak drastis padahal pemakaian sama seperti bulan lalu,Listrik,rendah,rendah,Rungkut
+21,Banjir setinggi lutut merendam pemukiman warga akibat hujan deras semalam,Banjir,tinggi,tinggi,Sukolilo
+22,Drainase tidak mampu menampung air hujan menyebabkan genangan di jalan utama,Banjir,tinggi,tinggi,Gubeng
+23,Banjir rob mulai masuk ke rumah warga pesisir saat air laut pasang,Banjir,tinggi,tinggi,Wonokromo
+24,Got mampet karena sampah membuat air hujan menggenang lama di permukiman,Banjir,rendah,rendah,Tegalsari
+25,Sungai meluap akibat curah hujan tinggi mengancam pemukiman padat penduduk,Banjir,tinggi,tinggi,Rungkut
+26,Angkutan umum semakin jarang lewat warga menunggu lebih dari satu jam,Transportasi,rendah,rendah,Sukolilo
+27,Halte bus rusak atapnya bocor saat hujan penumpang kehujanan menunggu,Transportasi,rendah,rendah,Gubeng
+28,Kemacetan parah setiap pagi di simpang jalan akibat traffic light mati,Transportasi,tinggi,tinggi,Wonokromo
+29,Sopir angkot ugal-ugalan membahayakan penumpang dan pengguna jalan lain,Transportasi,tinggi,rendah,Tegalsari
+30,Jembatan penyeberangan rusak warganya nekat menyeberang jalan raya yang ramai,Transportasi,tinggi,tinggi,Rungkut
+31,Taman kota kurang terawat banyak rumput liar dan fasilitas bermain rusak,Lainnya,rendah,rendah,Sukolilo
+32,Pelayanan kantor kelurahan lambat warga harus antre berjam-jam untuk urus dokumen,Lainnya,rendah,rendah,Gubeng
+33,Pohon tumbang menutup akses jalan setelah hujan angin kencang semalam,Lainnya,tinggi,tinggi,Wonokromo
+34,Keamanan lingkungan menurun belakangan sering terjadi pencurian motor,Lainnya,tinggi,rendah,Tegalsari
+35,Fasilitas posyandu kurang memadai untuk melayani warga sekitar,Lainnya,rendah,rendah,Rungkut
