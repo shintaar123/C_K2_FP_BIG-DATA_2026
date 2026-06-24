@@ -21,7 +21,7 @@ def scrape_threads_nyata(hashtags, max_scrolls=2):
     
     with sync_playwright() as p:
         # headless=True agar berjalan senyap di background (tanpa membuka window GUI)
-        browser = p.chromium.launch(headless=True)
+        browser = p.firefox.launch(headless=True)
         # Muat state/cookies agar kita langsung terdeteksi login
         context = browser.new_context(storage_state=cookie_path)
         page = context.new_page()
@@ -47,10 +47,29 @@ def scrape_threads_nyata(hashtags, max_scrolls=2):
                 # Ambil semua teks dari hasil pencarian
                 posts = page.locator('div[data-pressable-container="true"]').all_inner_texts()
                 
-                for post in posts:
+                for idx, post in enumerate(posts):
                     # Filter teks kosong
                     if post.strip() and len(post.strip()) > 15:
-                        hasil_teks.append(post.strip())
+                        import datetime
+                        import hashlib
+                        
+                        teks = post.strip()
+                        # Generate unique ID based on hash of text
+                        post_id = hashlib.md5(teks.encode('utf-8')).hexdigest()[:15]
+                        
+                        record = {
+                            "id": f"threads_{tag}_{post_id}",
+                            "source_type": "threads",
+                            "source_name": f"threads_playwright_{tag}",
+                            "raw_text": teks[:2000],
+                            "author": "warga_surabaya", # Threads DOM parsing for author is complex, default to this
+                            "url": f"https://www.threads.net/search?q=%23{tag}",
+                            "likes": 0,
+                            "shares": 0,
+                            "published_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            "scraped_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        }
+                        hasil_teks.append(record)
                         
                 print(f"[Threads] Menemukan {len(posts)} post di #{tag}")
                 

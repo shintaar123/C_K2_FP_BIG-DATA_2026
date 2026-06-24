@@ -4,7 +4,7 @@ import os
 print("Memulai Playwright...")
 with sync_playwright() as p:
     # Membuka browser sungguhan yang bisa Anda lihat
-    browser = p.chromium.launch(headless=False)
+    browser = p.firefox.launch(headless=False)
     context = browser.new_context()
     page = context.new_page()
 
@@ -12,8 +12,8 @@ with sync_playwright() as p:
     page.goto("https://www.threads.net/login")
     
     print("\n=======================================================")
-    print("BROWSER CHROMIUM TELAH TERBUKA!")
-    print("1. Silakan buka window Chromium yang baru saja muncul.")
+    print("BROWSER FIREFOX TELAH TERBUKA!")
+    print("1. Silakan buka window Firefox yang baru saja muncul.")
     print("2. Login menggunakan username dan password akun TUMBAL Anda.")
     print("3. JANGAN gunakan akun pribadi yang penting!")
     print("4. Jika sudah berhasil login dan melihat beranda (Feed) Threads,")

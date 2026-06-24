@@ -15,13 +15,10 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
 from scrapers.social_media.youtube_scraper import run_youtube_scraper
-from scrapers.social_media.generate_scraper import generate_x_records, generate_reddit_records
-from scrapers.social_media.threads_scraper import run_threads_scraper
+from scrapers.social_media.threads_playwright import scrape_threads_nyata
 from scrapers.sources_config import (
     KAFKA_BOOTSTRAP_SERVERS,
     KAFKA_TOPIC_YOUTUBE,
-    KAFKA_TOPIC_X,
-    KAFKA_TOPIC_REDDIT,
     KAFKA_TOPIC_THREADS,
 )
 from producer import get_producer, send_records
@@ -44,9 +41,11 @@ def main():
     producer = get_producer(KAFKA_BOOTSTRAP_SERVERS)
 
     scrape_and_send(run_youtube_scraper, KAFKA_TOPIC_YOUTUBE, "YouTube", producer)
-    scrape_and_send(lambda: generate_x_records(30), KAFKA_TOPIC_X, "X (generated)", producer)
-    scrape_and_send(lambda: generate_reddit_records(20), KAFKA_TOPIC_REDDIT, "Reddit (generated)", producer)
-    scrape_and_send(run_threads_scraper, KAFKA_TOPIC_THREADS, "Threads", producer)
+    
+    # Menjalankan Threads Nyata via Playwright
+    # Kita berikan daftar hashtag target
+    tags = ["keluhansurabaya", "pdamsurabaya", "surabaya"]
+    scrape_and_send(lambda: scrape_threads_nyata(tags), KAFKA_TOPIC_THREADS, "Threads (Playwright)", producer)
 
     print("\n[run_social_to_kafka] Selesai semua sumber.")
 
