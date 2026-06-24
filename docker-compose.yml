@@ -82,10 +82,15 @@ services:
       - "7077:7077"   # Spark Master port (untuk worker & job)
     environment:
       SPARK_MODE: master
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     volumes:
       - ./spark:/opt/spark/work-dir/app
+      - ./data:/opt/spark/work-dir/data   # dataset berlabel untuk training & predict
+      - ./llm:/opt/spark/work-dir/llm     # script LLM enrichment
 
   spark-worker:
     image: apache/spark:3.5.3
@@ -95,10 +100,15 @@ services:
       - spark-master
     environment:
       SPARK_MODE: worker
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     volumes:
       - ./spark:/opt/spark/work-dir/app
+      - ./data:/opt/spark/work-dir/data
+      - ./llm:/opt/spark/work-dir/llm
   trino:
     image: trinodb/trino:455
     container_name: trino
@@ -116,7 +126,7 @@ services:
       hive-postgres:
         condition: service_healthy
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
@@ -169,8 +179,12 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      # paket docker SDK supaya DAG bisa exec spark-submit ke container spark-master
+      _PIP_ADDITIONAL_REQUIREMENTS: "docker==7.1.0"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
+      # socket Docker host: dipakai spark_submit_helper untuk exec ke spark-master
+      - /var/run/docker.sock:/var/run/docker.sock
     command: scheduler
   grafana:
     image: grafana/grafana:11.3.0

@@ -100,6 +100,43 @@ def generate_reddit_records(n: int = 20) -> list[dict]:
     return records
 
 
+TEMPLATES_THREADS = [
+    "Air PDAM {lokasi} mati lagi dari subuh, ini udah keberapa kalinya bulan ini 😩 #PDAMSurabaya",
+    "Sampah numpuk di {lokasi} belum diangkut, baunya kemana-mana. Tolong dong pemkot #sampahsurabaya",
+    "Jalan {lokasi} berlubang makin parah, motor pada oleng. Kapan diperbaiki? #surabaya",
+    "Banjir lagi di {lokasi} tiap hujan deras, drainasenya udah ga sanggup nampung #keluhansurabaya",
+    "Lampu jalan {lokasi} mati total, gelap banget malem-malem rawan banget #surabaya",
+    "Pipa bocor depan {lokasi}, air ngalir terus ke jalan dari kemarin. Sayang banget #PDAMSurabaya",
+    "Got mampet di {lokasi}, air meluap tiap hujan. Mohon dikeruk pemkot #keluhansurabaya",
+]
+
+AUTHORS_THREADS = ["arek_suroboyo", "warga.sby", "infosurabaya", "suarawarga_sby", "sby.update"]
+
+
+def generate_threads_records(n: int = 20) -> list[dict]:
+    """Data generate Threads (fallback). Threads butuh login & agresif anti-bot."""
+    records = []
+    now = datetime.datetime.now(datetime.timezone.utc)
+    for i in range(n):
+        lokasi = random.choice(LOKASI_SURABAYA)
+        text = random.choice(TEMPLATES_THREADS).format(lokasi=lokasi)
+        published = (now - datetime.timedelta(hours=random.randint(1, 48))).isoformat()
+        fake_id = f"threads_gen_{i:04d}_{lokasi.lower().replace(' ', '_')}"
+        records.append({
+            "id": BaseScraper.make_id("threads_generate", fake_id),
+            "source_type": "threads",
+            "source_name": "threads_generated",
+            "raw_text": text,
+            "author": random.choice(AUTHORS_THREADS),
+            "url": None,
+            "likes": random.randint(0, 200),
+            "shares": random.randint(0, 40),
+            "published_at": published,
+            "scraped_at": BaseScraper.now_iso(),
+        })
+    return records
+
+
 if __name__ == "__main__":
     x_records = generate_x_records(30)
     reddit_records = generate_reddit_records(20)

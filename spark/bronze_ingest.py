@@ -1,20 +1,22 @@
 """
 bronze_ingest.py
-Spark Structured Streaming: Kafka (raw-rss, raw-x, raw-reddit, raw-yt) -> Bronze Delta Lake (MinIO).
+Spark Structured Streaming: Kafka (raw-rss, raw-x, raw-reddit, raw-yt, raw-threads) -> Bronze Delta Lake (MinIO).
 Ini bagian terakhir tanggung jawab Ingestion Engineer: scraper -> Kafka -> Bronze.
 Setelah ini, tanggung jawab pindah ke ML/Pipeline Engineer (Bronze -> Silver -> Gold).
+
+CATATAN: ini versi STREAMING (jalan terus, hentikan dengan Ctrl+C setelah data masuk).
+Untuk batch sekali jalan yang otomatis berhenti, pakai `bronze_ingest_once.py`.
 
 Cara jalanin (di dalam container spark-master, file ini ke-mount otomatis ke
 /opt/spark/work-dir/app/bronze_ingest.py karena folder ./spark di-mount di docker-compose):
 
     docker compose exec spark-master /opt/spark/bin/spark-submit \\
-      --packages io.delta:delta-spark_2.12:3.2.0,org.apache.spark.kafka:spark-sql-kafka-0-10_2.12:3.5.1,org.apache.hadoop:hadoop-aws:3.3.4 \\
+      --packages io.delta:delta-spark_2.12:3.2.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,org.apache.hadoop:hadoop-aws:3.3.4 \\
       --conf spark.jars.ivy=/tmp/.ivy \\
       /opt/spark/work-dir/app/bronze_ingest.py
 
-NOTE: sesuaikan versi spark-sql-kafka dengan versi Spark yang dipakai image spark-master
-(cek di docker-compose.yml / image tag). Kalau versi gak cocok, error-nya jelas
-("provider org.apache.spark.sql.kafka010... not found") tinggal ganti versi paketnya.
+NOTE: versi spark-sql-kafka HARUS sama dengan versi image Spark (3.5.3). Kalau tidak cocok,
+error-nya jelas ("provider org.apache.spark.sql.kafka010... not found") -> ganti versi paketnya.
 """
 
 from pyspark.sql import SparkSession
@@ -22,7 +24,7 @@ from pyspark.sql.functions import from_json, col, current_timestamp
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
 KAFKA_BOOTSTRAP = "kafka:9094"  # listener INTERNAL, dipakai antar-container (bukan localhost)
-TOPICS = "raw-rss,raw-x,raw-reddit,raw-yt"  # Spark subscribe ke 4 topic sekaligus
+TOPICS = "raw-rss,raw-x,raw-reddit,raw-yt,raw-threads"  # subscribe semua sumber
 CHECKPOINT_PATH = "s3a://bronze/_checkpoints/news_raw"
 BRONZE_PATH = "s3a://bronze/news_raw"
 

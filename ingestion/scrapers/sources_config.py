@@ -65,3 +65,10 @@ X_SEARCH_QUERIES = [
     "@pemkot_sby keluhan",
 ]
 KAFKA_TOPIC_X = "raw-x"
+
+# ── Threads (Meta) ───────────────────────────────────────────────────────────
+# Hashtag/profil publik yang dipantau. Threads sangat agresif anti-bot (butuh login),
+# jadi scraper berusaha best-effort lalu fallback ke data generate realistis.
+THREADS_HASHTAGS = ["surabaya", "keluhansurabaya", "pdamsurabaya", "sampahsurabaya"]
+THREADS_PROFILES = ["pemkotsurabaya"]
+KAFKA_TOPIC_THREADS = "raw-threads"

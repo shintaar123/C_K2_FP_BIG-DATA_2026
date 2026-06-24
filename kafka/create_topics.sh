@@ -5,7 +5,7 @@
 
 set -e
 
-TOPICS=("raw-rss" "raw-x" "raw-reddit" "raw-yt")
+TOPICS=("raw-rss" "raw-x" "raw-reddit" "raw-yt" "raw-threads")
 
 for TOPIC in "${TOPICS[@]}"; do
   echo ">>> Membuat topic: $TOPIC"
