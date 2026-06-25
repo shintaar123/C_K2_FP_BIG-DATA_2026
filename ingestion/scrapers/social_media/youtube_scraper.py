@@ -8,7 +8,12 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from googleapiclient.discovery import build
+try:
+    from googleapiclient.discovery import build
+    HAS_GOOGLE_API = True
+except ImportError:
+    HAS_GOOGLE_API = False
+
 from scrapers.base_scraper import BaseScraper
 from scrapers.sources_config import RELEVANT_KEYWORDS, YOUTUBE_SEARCH_QUERIES
 
@@ -23,6 +28,8 @@ class YouTubeScraper(BaseScraper):
 
     def __init__(self, api_key: str):
         super().__init__()
+        if not HAS_GOOGLE_API:
+            raise ImportError("Library 'google-api-python-client' tidak terinstall. Jalankan 'pip install google-api-python-client' untuk mengaktifkan YouTube scraping.")
         self.youtube = build("youtube", "v3", developerKey=api_key)
 
     def fetch(self) -> list[dict]:
@@ -88,9 +95,13 @@ def run_youtube_scraper() -> list[dict]:
         import logging
         logging.getLogger("YouTubeScraper").error("YOUTUBE_API_KEY belum diset di .env!")
         return []
-
-    scraper = YouTubeScraper(api_key)
-    return scraper.run()
+    try:
+        scraper = YouTubeScraper(api_key)
+        return scraper.run()
+    except ImportError as e:
+        import logging
+        logging.getLogger("YouTubeScraper").warning(f"YouTube Scraper dilewati: {e}")
+        return []
 
 
 if __name__ == "__main__":

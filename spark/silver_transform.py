@@ -176,9 +176,9 @@ urgency_score_udf = F.udf(urgency_score, FloatType())
 print(f">>> Membaca Bronze dari {BRONZE_PATH}...")
 
 
-bronze_df = spark.read.format("delta").load(BRONZE_PATH)
+bronze_df = spark.read.format("delta").load(BRONZE_PATH).dropDuplicates(["id"])
 total = bronze_df.count()
-print(f">>> Total record Bronze: {total}")
+print(f">>> Total record Bronze (deduplicated): {total}")
 
 # ─── Transform ───────────────────────────────────────────────────────────────
 

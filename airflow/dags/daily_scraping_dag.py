@@ -8,7 +8,7 @@ PYTHON = "python"
 with DAG(
     dag_id="daily_scraping_dag",
     description="Scraping semua sumber (RSS, YouTube, X+Reddit generated) -> Kafka",
-    schedule="0 6 * * *",
+    schedule="0 * * * *",
     start_date=datetime(2026, 6, 1),
     catchup=False,
     tags=["ingestion", "sprint2"],

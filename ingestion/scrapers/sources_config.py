@@ -27,7 +27,8 @@ RSS_SOURCES = [
 ]
 
 # Kafka
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"  # dari laptop. Kalau script jalan di dalam container, ganti ke "kafka:9094"
+import os
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPIC_RSS = "raw-rss"
 
 # Keyword sederhana buat filter awal: hanya simpan artikel yang KEMUNGKINAN soal keluhan publik.

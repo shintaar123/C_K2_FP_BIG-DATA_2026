@@ -4,12 +4,18 @@ import time
 import random
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sync_playwright = None
 
 def scrape_threads_nyata(hashtags, max_scrolls=2):
     """
     Scraper Threads menggunakan Playwright dengan cookies yang sudah tersimpan.
     """
+    if sync_playwright is None:
+        print("[WARNING] Playwright tidak terinstall. Skip scraping Threads.")
+        return []
     cookie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies_threads.json")
     
     if not os.path.exists(cookie_path):

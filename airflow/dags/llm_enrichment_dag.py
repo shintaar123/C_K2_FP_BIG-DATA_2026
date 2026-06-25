@@ -24,6 +24,7 @@ def _enrich(**_):
         env = {
             "GEMINI_API_KEY":   Variable.get("GEMINI_API_KEY", default_var=""),
             "NVIDIA_API_KEY":   Variable.get("NVIDIA_API_KEY", default_var=""),
+            "NVIDIA_MODEL":     Variable.get("NVIDIA_MODEL", default_var="meta/llama-3.3-70b-instruct"),
             "GROQ_API_KEY":     Variable.get("GROQ_API_KEY", default_var=""),
             "CEREBRAS_API_KEY": Variable.get("CEREBRAS_API_KEY", default_var=""),
         }
@@ -35,7 +36,7 @@ def _enrich(**_):
 with DAG(
     dag_id="llm_enrichment_dag",
     description="Gold Q1+Q2 -> LLM -> LLM-Gold (gold.complaint_enriched)",
-    schedule="0 10 * * *",
+    schedule="45 * * * *",
     start_date=datetime(2026, 6, 1),
     catchup=False,
     tags=["llm", "sprint5", "pipeline"],
