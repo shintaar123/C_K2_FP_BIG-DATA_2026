@@ -1,0 +1,20 @@
+# Dependency dashboard FastAPI custom (dashboard_server.py)
+# Versi di-pin agar reproducible di mesin tim.
+#
+# Cara install (di host Windows / WSL):
+#   python -m venv .venv
+#   source .venv/bin/activate          # WSL/Linux/Mac
+#   .venv\Scripts\activate             # PowerShell
+#   pip install -r requirements-dashboard.txt
+#   python dashboard_server.py
+#
+# Catatan: deltalake 0.22+ TIDAK lagi menarik pyarrow secara otomatis.
+# Kalau hanya `pip install deltalake` tanpa pyarrow, akan muncul error:
+#   "Pyarrow is required, install deltalake[pyarrow]"
+# Karena itu pyarrow di-pin terpisah secara eksplisit di bawah.
+
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pandas==2.2.3
+deltalake==0.22.3
+pyarrow==18.1.0
