@@ -109,6 +109,24 @@ class SupersetClient:
         except Exception as e:
             print(f"[login] OK sebagai {self.username} (CSRF skip — {e})")
 
+        # Ambil ID user admin supaya bisa di-set eksplisit sebagai owner chart
+        # & dashboard. Tanpa owners eksplisit, Superset coba pakai current_user
+        # yang kadang ke-resolve sebagai Anonymous -> crash _sa_instance_state.
+        self.user_id = 1  # admin hampir selalu id=1 di DB fresh (fallback aman)
+        try:
+            me = self.session.get(
+                f"{self.base}/api/v1/me/",
+                headers={"Authorization": f"Bearer {self.access_token}"},
+                timeout=10,
+            )
+            if me.status_code == 200:
+                self.user_id = me.json()["result"]["id"]
+                print(f"[login] admin user_id = {self.user_id}")
+            else:
+                print(f"[login] /me/ status {me.status_code}, fallback user_id=1")
+        except Exception as e:
+            print(f"[login] /me/ gagal ({e}), fallback user_id=1")
+
     def _headers(self, with_csrf: bool = False) -> Dict[str, str]:
         h = {
             "Authorization": f"Bearer {self.access_token}",
@@ -246,6 +264,8 @@ def create_chart(
         "datasource_id": dataset_id,
         "datasource_type": "table",
         "params": json.dumps(params_with_ds),
+        # Set owner eksplisit -> hindari fallback ke Anonymous user (crash).
+        "owners": [client.user_id],
     }
     try:
         res = client.post("/api/v1/chart/", body)
@@ -530,6 +550,7 @@ def ensure_dashboard(client: SupersetClient, chart_ids: List[int]) -> int:
         "dashboard_title": DASHBOARD_TITLE,
         "published": True,
         "slug": "surabaya-ews-analitik",
+        "owners": [client.user_id],
         "position_json": json.dumps(position_json),
         "css": "",
         "json_metadata": json.dumps({
