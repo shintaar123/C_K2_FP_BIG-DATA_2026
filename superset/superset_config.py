@@ -66,5 +66,9 @@ ENABLE_TIME_ROTATE = True
 # mengaktifkan, install dulu: pip install flask-cors, lalu set ENABLE_CORS=True.
 ENABLE_CORS = False
 
-# Public role (gak dipakai di demo, tapi safe default)
-PUBLIC_ROLE_LIKE = "Gamma"
+# CATATAN: JANGAN set PUBLIC_ROLE_LIKE / AUTH_ROLE_PUBLIC.
+# Kalau di-set, request API (mis. POST /api/v1/chart/) bisa di-resolve sebagai
+# 'AnonymousUserMixin' walau JWT valid, sehingga saat Superset mencoba menempel
+# owner ke chart -> crash:
+#   AttributeError: 'AnonymousUserMixin' object has no attribute '_sa_instance_state'
+# Biarkan default (anonim dimatikan) supaya bootstrap bisa create chart/dashboard.
