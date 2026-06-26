@@ -73,8 +73,7 @@ Pelacakan model  : MLflow (artefak di MinIO)
 Orkestrasi       : Script loop (run_continuous / run_pipeline)
 ```
 
-<!-- SCREENSHOT 1: diagram arsitektur versi rapi (boleh dibuat ulang di draw.io) -->
-![Diagram Arsitektur](docs/img/01-arsitektur.png)
+> *Tambahkan diagram arsitektur di `docs/img/01-arsitektur.png`*
 
 ---
 
@@ -221,11 +220,9 @@ python dashboard_server.py
 .\run_continuous.ps1 -IntervalSeconds 1800     # loop tiap 30 menit
 ```
 
-<!-- SCREENSHOT 2: hasil "docker compose ps" semua container healthy -->
-![Container Healthy](docs/img/02-docker-ps.png)
+> *Tambahkan screenshot `docker compose ps` di `docs/img/02-docker-ps.png`*
 
-<!-- SCREENSHOT 3: output terminal "PIPELINE SELESAI!" -->
-![Pipeline Selesai](docs/img/03-pipeline-selesai.png)
+> *Tambahkan screenshot output pipeline di `docs/img/03-pipeline-selesai.png`*
 
 ---
 
@@ -263,8 +260,7 @@ Dataset berlabel
 - Model 3 - Urgency Classifier: biner (tinggi/rendah), seberapa mendesak keluhan perlu ditangani.
 - Anomaly Detection: Isolation Forest per grup (kecamatan x kategori) berbasis time-series Gold. Sementara flag anomali menggunakan z-score (>2 sigma) sambil menunggu histori cukup.
 
-<!-- SCREENSHOT 4: MLflow UI - daftar run/experiment + metrik model -->
-![MLflow Experiment](docs/img/04-mlflow.png)
+> *Tambahkan screenshot MLflow UI di `docs/img/04-mlflow.png`*
 
 ---
 
@@ -351,20 +347,15 @@ Dashboard utama dibangun dengan FastAPI (backend, membaca Delta Lake langsung vi
 
 Warna kategori konsisten di seluruh chart. Dashboard mencakup 31 kecamatan Surabaya (ditambah kategori "Tidak Diketahui" untuk lokasi yang tidak terdeteksi).
 
-<!-- SCREENSHOT 5: Dashboard custom - halaman Overview (mode terang) -->
 ![Dashboard Overview](docs/img/05-dashboard-overview.png)
 
-<!-- SCREENSHOT 6: Dashboard custom - halaman Peta Sebaran -->
-![Dashboard Peta](docs/img/06-dashboard-peta.png)
+![Dashboard Peta Sebaran](docs/img/06-dashboard-peta.png)
 
-<!-- SCREENSHOT 7: Dashboard custom - halaman Analitik (scatter 4-kuadran) -->
 ![Dashboard Analitik](docs/img/07-dashboard-analitik.png)
 
-<!-- SCREENSHOT 8: Dashboard custom - halaman Rekomendasi AI -->
 ![Dashboard Rekomendasi AI](docs/img/08-dashboard-ai.png)
 
-<!-- SCREENSHOT 9 (opsional): Dashboard custom - mode gelap -->
-![Dashboard Dark Mode](docs/img/09-dashboard-dark.png)
+> *Screenshot mode gelap (opsional — tambahkan `docs/img/09-dashboard-dark.png` jika ada)*
 
 ---
 
@@ -441,17 +432,13 @@ ORDER BY priority_rank
 LIMIT 10;
 ```
 
-<!-- SCREENSHOT 10: Superset SQL Lab atau Trino UI menampilkan hasil query gold -->
-![Verifikasi Trino](docs/img/10-trino-query.png)
+> *Tambahkan screenshot Trino/Superset SQL Lab di `docs/img/10-trino-query.png`*
 
-<!-- SCREENSHOT 11: Superset - dashboard "Surabaya EWS - Analitik Keluhan" -->
 ![Superset Dashboard](docs/img/11-superset.png)
 
-<!-- SCREENSHOT 12: Grafana - dashboard "Surabaya EWS Monitoring" -->
 ![Grafana Dashboard](docs/img/12-grafana.png)
 
-<!-- SCREENSHOT 13: MinIO Console - bucket bronze/silver/gold/mlflow -->
-![MinIO Buckets](docs/img/13-minio.png)
+> *Tambahkan screenshot MinIO Console di `docs/img/13-minio.png`*
 
 ---
 
