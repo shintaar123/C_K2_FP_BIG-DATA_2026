@@ -15,7 +15,7 @@ Pipeline mencakup keempat lapisan arsitektur Big Data yang lengkap:
 | **Ingestion** | Apache Kafka | Menampung & menyalurkan data masuk dari scraper |
 | **Storage** | MinIO + Delta Lake | Menyimpan seluruh layer data (object storage S3-compatible) |
 | **Processing** | Apache Spark | Transformasi Bronze -> Silver -> Gold + ML |
-| **Serving** | Trino + Superset + Grafana | Query SQL & visualisasi untuk pengguna akhir |
+| **Serving** | Trino + Superset + Grafana + FastAPI custom | Query SQL & visualisasi untuk pengguna akhir (lihat Section 7) |
 | **Catalog** | Hive Metastore | Katalog metadata seluruh tabel |
 | **Orchestration** | Apache Airflow | Penjadwalan pipeline harian |
 | **ML Tracking** | MLflow | Pelacakan eksperimen & versi model |
@@ -77,7 +77,7 @@ Dipilih sebagai **katalog metadata terpusat**. Menyimpan definisi skema seluruh 
 Dipilih sebagai **query engine SQL terdistribusi** yang memungkinkan dashboard membaca layer Gold menggunakan SQL standar, tanpa harus menjalankan Spark setiap kali. Trino dioptimasi untuk query analitik interaktif (latensi rendah), cocok untuk kebutuhan dashboard yang responsif.
 
 ### Apache Superset & Grafana (Serving)
-**Superset** dipilih untuk dashboard analitik eksploratif (scatter 4-kuadran, heatmap peta kecamatan). **Grafana** dipilih untuk monitoring time-series dan **alerting** otomatis saat muncul keluhan prioritas tinggi (Q1). Keduanya open-source dan terhubung ke Trino sebagai sumber data.
+**Superset** dipilih untuk dashboard analitik eksploratif (scatter 4-kuadran, heatmap peta kecamatan). **Grafana** dipilih untuk monitoring time-series dan **alerting visual** (panel berubah warna sesuai threshold) saat muncul keluhan prioritas tinggi (Q1). Keduanya open-source dan terhubung ke Trino sebagai sumber data. Detail lengkap & cara provisioning ada di Section 7.
 
 ### Apache Airflow (Orchestration)
 Dipilih untuk **menjadwalkan dan memantau** pipeline harian (scraping 06.00, ETL 08.00, LLM 10.00, retrain mingguan). Mendukung dependency antar-tahap (DAG), retry otomatis, dan pemantauan visual. Menggunakan `LocalExecutor` untuk efisiensi resource pada skala proyek ini.
@@ -97,7 +97,97 @@ Dipilih untuk **melacak eksperimen model**: menyimpan metrik (F1, AUC, Precision
 
 ---
 
-## 5. Pemetaan ke Materi Kuliah
+## 5. Serving Layer — Hybrid (Superset + Grafana + FastAPI Custom)
+
+Sesuai rencana implementasi & untuk memaksimalkan nilai K2 (Desain Infrastruktur)
+sekaligus inovasi, **serving layer dipecah ke tiga tools yang saling melengkapi**:
+
+| Tool | Peran | Audience | Port |
+|---|---|---|---|
+| **Apache Superset** | Dashboard analitik eksploratif (scatter 4-kuadran Eisenhower, heatmap kecamatan x kategori, distribusi kategori, tren waktu, tabel LLM-enriched). | Analis / dosen — eksplorasi mendalam | 8088 |
+| **Grafana** | Monitoring real-time dengan **visual alert** (panel berubah merah saat threshold dilewati, mis. Q1 ≥ 25). Cocok untuk control-center / operator. | Operator pemerintah daerah | 3000 |
+| **FastAPI Custom Dashboard** | Tampilan storytelling interaktif: peta Surabaya (Leaflet) + scatter 4-kuadran Chart.js + tren harian + indikator anomali + sidebar rekomendasi LLM. Value-add inovasi tim. | Stakeholder / presentasi | 8050 |
+
+### 5.1 Provisioning Otomatis (Reproducible, bukan klik manual)
+
+Karena seluruh stack berjalan via `docker compose`, **tidak ada klik UI** untuk
+setup dashboard. Semua aset disimpan sebagai file di repo dan dimount ke
+container.
+
+**Grafana** — file-based provisioning (native Grafana feature):
+```
+grafana/provisioning/
+├── datasources/trino.yaml          # Datasource Trino otomatis ke-load
+└── dashboards/
+    ├── dashboard-provider.yaml      # Provider config (load semua *.json)
+    └── surabaya-ews-monitoring.json # Dashboard utama (9 panel)
+```
+Saat container Grafana start, plugin `trino-datasource` di-install otomatis,
+datasource dibaca dari YAML, dashboard di-import dari JSON. Visual alert
+diimplementasikan via threshold warna (green/yellow/red) per panel — tanpa
+notifikasi eksternal (email/Telegram), sesuai keputusan tim.
+
+**Superset** — REST API bootstrap (lebih robust daripada YAML asset bundle):
+```
+superset/
+├── bootstrap.py       # Python script idempoten via Superset REST API
+└── README.md          # Cara rerun manual + troubleshooting
+```
+Service baru di `docker-compose.yml`: `superset-bootstrap` yang menunggu
+Superset siap (poll `/health`), login admin, lalu membuat: database Trino
+(`trino://admin@trino:8080/delta`) → 2 dataset (`gold.complaint_daily`,
+`gold.complaint_enriched`) → 9 chart (termasuk Scatter 4-Kuadran wajib) →
+1 dashboard. Script idempoten — aman di-rerun, skip resource yang sudah ada.
+
+**FastAPI Custom** — kode langsung di repo:
+```
+dashboard_server.py            # FastAPI (port 8050) baca Delta via deltalake
+templates/index.html           # UI dark-mode (Leaflet + Chart.js)
+requirements-dashboard.txt     # Versi pinned, pyarrow eksplisit
+```
+
+### 5.2 Cara Menjalankan (Urutan)
+
+```bash
+# 1) Start seluruh stack
+docker compose up -d
+
+# 2) Setelah Spark master/worker siap, jalankan pipeline (lihat README utama)
+#    Output: tabel gold.complaint_daily & gold.complaint_enriched (Delta di MinIO)
+
+# 3) Cek hasil:
+#    Trino    -> http://localhost:8081  (query: SELECT * FROM delta.gold.complaint_daily)
+#    Superset -> http://localhost:8088  (login admin/admin -> dashboard "Surabaya EWS — Analitik Keluhan")
+#    Grafana  -> http://localhost:3000  (login admin/admin -> folder "Surabaya EWS")
+
+# 4) FastAPI custom dashboard (jalan terpisah di host):
+pip install -r requirements-dashboard.txt
+python dashboard_server.py
+# Buka http://localhost:8050
+```
+
+### 5.3 Konsistensi Data antar Serving Tools
+
+Ketiga dashboard membaca **sumber data yang sama** (tabel Delta di MinIO):
+- Superset & Grafana via **Trino** (SQL terdistribusi) — `delta.gold.*`
+- FastAPI custom via library **deltalake** (Python, langsung baca S3) —
+  `s3://gold/warehouse/gold.db/*`
+
+Implikasinya: kalau pipeline Spark re-run dan tabel ter-update, ketiga
+dashboard akan menunjukkan angka konsisten setelah refresh (Grafana &
+FastAPI auto-refresh 30 detik; Superset manual atau dijadwalkan per chart).
+
+> **Catatan teknis penting:** Penulisan tabel Gold di `spark/gold_aggregate.py`
+> dan `llm/llm_enrichment.py` sudah dibuat **idempoten** (DROP TABLE + clean
+> warehouse path sebelum saveAsTable) untuk menghindari bug Hive
+> `"Could not alter schema in a Hive compatible way"` yang menyebabkan Trino
+> gagal membaca tabel saat schema berubah antar run.
+
+---
+
+
+
+## 6. Pemetaan ke Materi Kuliah
 
 | Komponen | Teknologi | Materi |
 |---|---|---|
@@ -110,13 +200,13 @@ Dipilih untuk **melacak eksperimen model**: menyimpan metrik (F1, AUC, Precision
 | Orchestration | Apache Airflow | Minggu 12 |
 | Data Catalog | Hive Metastore | Minggu 11 |
 | Query Engine | Trino | Minggu 14 |
-| Dashboard | Superset + Grafana | Minggu 14 |
+| Dashboard | Superset + Grafana (+ FastAPI custom value-add) | Minggu 14 |
 
 Seluruh materi minggu 4-14 termanfaatkan dalam infrastruktur ini.
 
 ---
 
-## 6. Versi Komponen (Pinned)
+## 7. Versi Komponen (Pinned)
 
 | Komponen | Versi |
 |---|---|
@@ -132,3 +222,6 @@ Seluruh materi minggu 4-14 termanfaatkan dalam infrastruktur ini.
 | MLflow | ghcr.io/mlflow/mlflow:v2.17.2 |
 | Apache Superset | apache/superset:4.1.1 |
 | Grafana | grafana/grafana:11.3.0 |
+| Grafana plugin (Trino) | trino-datasource (terbaru, auto-install) |
+| FastAPI (dashboard custom) | fastapi 0.115.6, uvicorn 0.32.1 |
+| Delta Lake Python (dashboard) | deltalake 0.22.3 + pyarrow 18.1.0 |

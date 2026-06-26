@@ -129,13 +129,43 @@ async def get_stats():
     avg_resolution = 0
     if not df_enriched.empty and "estimated_resolution_days" in df_enriched.columns:
         avg_resolution = round(float(df_enriched["estimated_resolution_days"].mean()), 1)
-        
+
+    # ── Metrik tambahan untuk dashboard yang dipercantik ────────────────────
+    # Anomaly count (cluster dengan is_anomaly=True)
+    anomaly_count = 0
+    if "is_anomaly" in df_daily.columns:
+        anomaly_count = int(df_daily["is_anomaly"].fillna(False).astype(bool).sum())
+
+    # Rata-rata growth rate 3-hari (indikator tren naik)
+    avg_growth_rate = 0.0
+    if "complaint_growth_rate_3day" in df_daily.columns:
+        avg_growth_rate = round(
+            float(df_daily["complaint_growth_rate_3day"].fillna(0).mean()) * 100, 1
+        )
+
+    # Importance/Urgency high ratio rata-rata (skala 0-100%)
+    avg_importance_ratio = 0.0
+    avg_urgency_ratio = 0.0
+    if "importance_high_ratio" in df_daily.columns:
+        avg_importance_ratio = round(
+            float(df_daily["importance_high_ratio"].fillna(0).mean()) * 100, 1
+        )
+    if "urgency_high_ratio" in df_daily.columns:
+        avg_urgency_ratio = round(
+            float(df_daily["urgency_high_ratio"].fillna(0).mean()) * 100, 1
+        )
+
     return {
         "total_complaints": total_complaints,
         "q1_q2_count": q1_q2_count,
         "top_district": top_district,
         "top_category": top_category.upper(),
-        "avg_resolution_days": avg_resolution
+        "avg_resolution_days": avg_resolution,
+        # ── tambahan
+        "anomaly_count": anomaly_count,
+        "avg_growth_rate_pct": avg_growth_rate,
+        "avg_importance_ratio_pct": avg_importance_ratio,
+        "avg_urgency_ratio_pct": avg_urgency_ratio,
     }
 
 @app.get("/api/districts")
@@ -219,6 +249,118 @@ async def get_categories():
         
     cat_df = df_daily.groupby("category")["complaint_count"].sum().reset_index()
     return [{"category": row["category"].upper(), "count": int(row["complaint_count"])} for _, row in cat_df.iterrows()]
+
+
+@app.get("/api/scatter")
+async def get_scatter():
+    """Data untuk Scatter 4-Kuadran Eisenhower.
+
+    Tiap titik = (avg_urgency, avg_importance) per (kecamatan, category) di-rata-rata
+    sepanjang waktu, ukuran titik = total complaint_count, warna = quadrant dominan.
+    Ini memenuhi requirement plan: chart wajib "scatter 4-kuadran".
+    """
+    df_daily = get_df_from_delta("s3://gold/warehouse/gold.db/complaint_daily")
+    if df_daily.empty:
+        return []
+
+    grouped = (
+        df_daily.groupby(["kecamatan", "category"])
+        .agg(
+            avg_urgency=("avg_urgency", "mean"),
+            avg_importance=("avg_importance", "mean"),
+            complaint_count=("complaint_count", "sum"),
+            quadrant=("quadrant", lambda x: x.value_counts().index[0]),
+        )
+        .reset_index()
+    )
+
+    result = []
+    for _, row in grouped.iterrows():
+        q = row["quadrant"]
+        result.append({
+            "kecamatan": row["kecamatan"],
+            "category": row["category"].upper(),
+            "x": round(float(row["avg_urgency"]), 4),     # urgency on X
+            "y": round(float(row["avg_importance"]), 4),  # importance on Y
+            "r": max(5, min(30, int(row["complaint_count"]) * 1.5)),  # bubble radius
+            "complaint_count": int(row["complaint_count"]),
+            "quadrant": q,
+            "color": QUADRANT_COLORS.get(q, "#00ffcc"),
+        })
+    return result
+
+
+@app.get("/api/trend")
+async def get_trend():
+    """Tren keluhan harian per kuadran (untuk line chart time-series)."""
+    df_daily = get_df_from_delta("s3://gold/warehouse/gold.db/complaint_daily")
+    if df_daily.empty:
+        return {"dates": [], "series": {}}
+
+    # Pastikan kolom date jadi string YYYY-MM-DD agar JSON-safe & sortable
+    df_daily = df_daily.copy()
+    df_daily["date"] = pd.to_datetime(df_daily["date"]).dt.strftime("%Y-%m-%d")
+
+    pivot = (
+        df_daily.groupby(["date", "quadrant"])["complaint_count"]
+        .sum()
+        .unstack(fill_value=0)
+        .sort_index()
+    )
+
+    dates = list(pivot.index)
+    series = {}
+    for q in ["Q1", "Q2", "Q3", "Q4"]:
+        if q in pivot.columns:
+            series[q] = {
+                "data": [int(v) for v in pivot[q].tolist()],
+                "color": QUADRANT_COLORS[q],
+            }
+        else:
+            series[q] = {"data": [0] * len(dates), "color": QUADRANT_COLORS[q]}
+
+    return {"dates": dates, "series": series}
+
+
+@app.get("/api/anomalies")
+async def get_anomalies():
+    """Cluster anomali (is_anomaly=True) + growth_rate tinggi → indikator early warning."""
+    df_daily = get_df_from_delta("s3://gold/warehouse/gold.db/complaint_daily")
+    if df_daily.empty:
+        return []
+
+    df = df_daily.copy()
+    if "is_anomaly" not in df.columns:
+        return []
+    df["is_anomaly"] = df["is_anomaly"].fillna(False).astype(bool)
+    df["complaint_growth_rate_3day"] = df.get("complaint_growth_rate_3day", 0).fillna(0)
+
+    # Anggap "anomali" kalau flag True ATAU growth_rate >= 50%
+    flagged = df[(df["is_anomaly"]) | (df["complaint_growth_rate_3day"] >= 0.5)]
+    if flagged.empty:
+        return []
+
+    flagged = flagged.copy()
+    flagged["date"] = pd.to_datetime(flagged["date"]).dt.strftime("%Y-%m-%d")
+    flagged = flagged.sort_values(
+        by=["complaint_growth_rate_3day", "complaint_count"], ascending=[False, False]
+    )
+
+    result = []
+    for _, row in flagged.head(20).iterrows():
+        q = row.get("quadrant", "Q4")
+        result.append({
+            "date": row["date"],
+            "kecamatan": row["kecamatan"],
+            "category": str(row["category"]).upper(),
+            "complaint_count": int(row["complaint_count"]),
+            "growth_rate_pct": round(float(row["complaint_growth_rate_3day"]) * 100, 1),
+            "is_anomaly": bool(row["is_anomaly"]),
+            "quadrant": q,
+            "color": QUADRANT_COLORS.get(q, "#00ffcc"),
+        })
+    return result
+
 
 if __name__ == "__main__":
     uvicorn.run("dashboard_server:app", host="0.0.0.0", port=8050, reload=True)

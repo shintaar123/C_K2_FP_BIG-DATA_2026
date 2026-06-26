@@ -173,11 +173,54 @@ print("\n>>> Distribusi kuadran:")
 gold.groupBy("quadrant").count().orderBy("quadrant").show()
 
 # ─── Tulis + register ke Hive (Delta) ─────────────────────────────────────────
+# CATATAN BUG SCHEMA HIVE (sebelum fix ini):
+#   `saveAsTable(..., mode="overwrite", overwriteSchema=true)` di atas tabel
+#   yang sudah ada dengan tipe kolom berbeda (mis. kolom `date` pernah ditulis
+#   sebagai STRING di run sebelumnya, lalu DATE di run ini) memicu:
+#     "HiveExternalCatalog: Could not alter schema of table gold.complaint_daily
+#      in a Hive compatible way"
+#   Spark tetap menulis, tetapi sebagai format Spark-SQL-specific -> Trino TIDAK
+#   bisa SELECT tabel tersebut (atau membaca dengan tipe salah).
+#
+# FIX (paling robust & idempoten):
+#   1) DROP TABLE IF EXISTS  -> bersihkan entri metastore
+#   2) Hapus path warehouse-nya  -> bersihkan _delta_log + parquet sisa run lama
+#   3) saveAsTable  -> tabel baru selalu Hive/Trino-compatible
+GOLD_DB        = "gold"
+TABLE_NAME     = "complaint_daily"
+TABLE_PATH_S3A = f"s3a://gold/warehouse/{GOLD_DB}.db/{TABLE_NAME}"
+
 print(f"\n>>> Menulis & register tabel {GOLD_TABLE}...")
-spark.sql("CREATE DATABASE IF NOT EXISTS gold")
+spark.sql(f"CREATE DATABASE IF NOT EXISTS {GOLD_DB}")
+
+print(f">>> Idempotent reset: DROP {GOLD_TABLE} + bersihkan {TABLE_PATH_S3A}")
+try:
+    spark.sql(f"DROP TABLE IF EXISTS {GOLD_TABLE}")
+except Exception as e:
+    print(f"    (warning) DROP TABLE gagal (lanjut): {e}")
+
+# Bersihkan sisa file di MinIO supaya tidak ada konflik _delta_log lama
+try:
+    hadoop_conf = spark._jsc.hadoopConfiguration()
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(
+        spark._jvm.java.net.URI(TABLE_PATH_S3A), hadoop_conf
+    )
+    path_obj = spark._jvm.org.apache.hadoop.fs.Path(TABLE_PATH_S3A)
+    if fs.exists(path_obj):
+        fs.delete(path_obj, True)
+        print(f"    Path {TABLE_PATH_S3A} dihapus.")
+    else:
+        print(f"    Path {TABLE_PATH_S3A} belum ada (run pertama), skip.")
+except Exception as e:
+    print(f"    (warning) bersih-bersih path gagal (lanjut tetap): {e}")
+
+# Pastikan kolom `date` ber-tipe DATE (bukan STRING) supaya konsisten antar run
+# dan Trino bisa langsung melakukan filter range tanggal.
+gold = gold.withColumn("date", F.col("date").cast("date"))
+
 (
     gold.write.format("delta")
-    .mode("overwrite").option("overwriteSchema", "true")
+    .mode("overwrite")
     .saveAsTable(GOLD_TABLE)
 )
 

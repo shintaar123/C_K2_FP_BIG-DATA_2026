@@ -1,0 +1,22 @@
+# Grafana datasource provisioning — Trino (plugin: trino-datasource by Starburst)
+# Akan otomatis dibuat saat Grafana start (lihat docker-compose.yml service grafana
+# yang me-mount folder ini ke /etc/grafana/provisioning).
+apiVersion: 1
+
+datasources:
+  - name: Trino
+    type: trino-datasource
+    uid: trino-surabaya
+    access: proxy
+    url: http://trino:8080
+    isDefault: true
+    editable: true
+    # Plugin Trino Starburst membaca koneksi dari jsonData.server
+    jsonData:
+      server: trino:8080
+      defaultCatalog: delta
+      defaultSchema: gold
+      protocol: http
+      # User Trino anonim (Trino tidak perlu auth secara default)
+      user: grafana
+      enableSecure: false

@@ -175,11 +175,44 @@ enriched.select(
     "complexity", "estimated_resolution_days", "llm_priority_score", "llm_summary",
 ).orderBy("priority_rank").show(20, truncate=60)
 
+# ─── Tulis + register ke Hive (Delta) ─────────────────────────────────────────
+# Lihat catatan panjang di gold_aggregate.py untuk alasan teknis fix ini.
+# Singkatnya: DROP + clean path supaya schema selalu konsisten antar run
+# dan tabel tetap Hive/Trino-compatible.
+GOLD_DB         = "gold"
+ENR_TABLE_NAME  = "complaint_enriched"
+ENR_TABLE_PATH  = f"s3a://gold/warehouse/{GOLD_DB}.db/{ENR_TABLE_NAME}"
+
 print(f"\n>>> Menulis & register tabel {ENRICHED_TABLE}...")
-spark.sql("CREATE DATABASE IF NOT EXISTS gold")
+spark.sql(f"CREATE DATABASE IF NOT EXISTS {GOLD_DB}")
+
+print(f">>> Idempotent reset: DROP {ENRICHED_TABLE} + bersihkan {ENR_TABLE_PATH}")
+try:
+    spark.sql(f"DROP TABLE IF EXISTS {ENRICHED_TABLE}")
+except Exception as e:
+    print(f"    (warning) DROP TABLE gagal (lanjut): {e}")
+
+try:
+    hadoop_conf = spark._jsc.hadoopConfiguration()
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(
+        spark._jvm.java.net.URI(ENR_TABLE_PATH), hadoop_conf
+    )
+    path_obj = spark._jvm.org.apache.hadoop.fs.Path(ENR_TABLE_PATH)
+    if fs.exists(path_obj):
+        fs.delete(path_obj, True)
+        print(f"    Path {ENR_TABLE_PATH} dihapus.")
+    else:
+        print(f"    Path {ENR_TABLE_PATH} belum ada (run pertama), skip.")
+except Exception as e:
+    print(f"    (warning) bersih-bersih path gagal (lanjut tetap): {e}")
+
+# Cast `date` (string 'YYYY-MM-DD' dari tuple) -> DATE supaya Trino bisa filter
+# range tanggal dengan benar (lebih konsisten dengan complaint_daily).
+enriched = enriched.withColumn("date", F.to_date(F.col("date")))
+
 (
     enriched.write.format("delta")
-    .mode("overwrite").option("overwriteSchema", "true")
+    .mode("overwrite")
     .saveAsTable(ENRICHED_TABLE)
 )
 
