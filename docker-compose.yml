@@ -172,6 +172,12 @@ services:
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
       SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://hive:hivepassword@hive-postgres:5432/superset
+      # Path ke file config Python (lihat ./superset/superset_config.py).
+      # Tanpa ini, Superset fallback ke SQLite -> 500 errors di UI.
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      PYTHONPATH: /app/pythonpath:/app
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
     entrypoint: /bin/bash
     command: >
       -c "pip install psycopg2-binary trino --quiet &&
@@ -190,6 +196,10 @@ services:
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
       SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://hive:hivepassword@hive-postgres:5432/superset
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      PYTHONPATH: /app/pythonpath:/app
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
     command: >
       bash -c "pip install psycopg2-binary trino --quiet &&
       gunicorn --bind 0.0.0.0:8088 --workers 2 --timeout 120 'superset.app:create_app()'"

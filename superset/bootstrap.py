@@ -89,15 +89,25 @@ class SupersetClient:
         r = self.session.post(url, json=payload, timeout=30)
         r.raise_for_status()
         self.access_token = r.json()["access_token"]
-        # Ambil CSRF token untuk request mutating (POST/PUT/DELETE)
-        csrf_r = self.session.get(
-            f"{self.base}/api/v1/security/csrf_token/",
-            headers={"Authorization": f"Bearer {self.access_token}"},
-            timeout=30,
-        )
-        csrf_r.raise_for_status()
-        self.csrf_token = csrf_r.json()["result"]
-        print(f"[login] OK sebagai {self.username}")
+
+        # CSRF token TIDAK wajib kalau pakai JWT Bearer di Superset 4.1.x.
+        # Endpoint /api/v1/security/csrf_token/ kadang return 403 di versi ini
+        # walau JWT-nya valid -> kita skip kalau gagal, lanjut pakai JWT-only.
+        self.csrf_token = None
+        try:
+            csrf_r = self.session.get(
+                f"{self.base}/api/v1/security/csrf_token/",
+                headers={"Authorization": f"Bearer {self.access_token}"},
+                timeout=10,
+            )
+            if csrf_r.status_code == 200:
+                self.csrf_token = csrf_r.json().get("result")
+                print(f"[login] OK sebagai {self.username} (+ CSRF)")
+            else:
+                print(f"[login] OK sebagai {self.username} "
+                      f"(CSRF skip — status {csrf_r.status_code}, JWT-only)")
+        except Exception as e:
+            print(f"[login] OK sebagai {self.username} (CSRF skip — {e})")
 
     def _headers(self, with_csrf: bool = False) -> Dict[str, str]:
         h = {
