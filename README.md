@@ -355,8 +355,6 @@ Warna kategori konsisten di seluruh chart. Dashboard mencakup 31 kecamatan Surab
 
 ![Dashboard Rekomendasi AI](docs/img/08-dashboard-ai.png)
 
-> *Screenshot mode gelap (opsional — tambahkan `docs/img/09-dashboard-dark.png` jika ada)*
-
 ---
 
 ## Skema Data
@@ -437,8 +435,6 @@ LIMIT 10;
 ![Superset Dashboard](docs/img/11-superset.png)
 
 ![Grafana Dashboard](docs/img/12-grafana.png)
-
-> *Tambahkan screenshot MinIO Console di `docs/img/13-minio.png`*
 
 ---
 
