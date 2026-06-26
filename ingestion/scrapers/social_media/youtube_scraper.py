@@ -3,6 +3,8 @@ youtube_scraper.py
 Scraper YouTube via YouTube Data API v3 (resmi, gratis 10k unit/hari).
 """
 
+from __future__ import annotations
+
 import os
 import sys
 

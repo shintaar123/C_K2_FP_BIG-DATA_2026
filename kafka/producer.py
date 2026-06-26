@@ -7,6 +7,8 @@ Cara test koneksi Kafka manual (pastikan `docker compose up -d` sudah jalan):
     python kafka/producer.py --test
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import sys

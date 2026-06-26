@@ -1,4 +1,13 @@
 import os
+
+# ── Matikan lookup metadata AWS (IMDS) ──────────────────────────────────────
+# deltalake/object_store default-nya nyoba ambil region & kredensial dari
+# endpoint metadata EC2 (169.254.169.254) -> di laptop ini nggak ada, jadi
+# timeout berulang & bikin log penuh WARN. Set region eksplisit + disable IMDS.
+os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
+os.environ.setdefault("AWS_REGION", "us-east-1")
+os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
+
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -15,7 +24,9 @@ STORAGE_OPTIONS = {
     "AWS_SECRET_ACCESS_KEY": "minioadmin123",
     "AWS_ENDPOINT_URL": "http://localhost:9000",
     "AWS_ALLOW_HTTP": "true",
-    "AWS_S3_ALLOW_UNSAFE_RENAME": "true"
+    "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
+    "AWS_REGION": "us-east-1",
+    "AWS_EC2_METADATA_DISABLED": "true",
 }
 
 # Koordinat Kecamatan di Surabaya
@@ -170,46 +181,50 @@ async def get_stats():
 
 @app.get("/api/districts")
 async def get_districts():
-    """Mengambil agregasi keluhan per kecamatan beserta koordinat peta."""
+    """Agregasi keluhan per kecamatan untuk peta.
+
+    Warna marker = kuadran PALING PARAH yang muncul di kecamatan itu
+    (urutan keparahan Q1 > Q2 > Q3 > Q4). Tujuannya supaya kecamatan yang
+    punya cluster kritis (Q1) langsung menonjol merah — sesuai semangat
+    early-warning. Popup dibuat konsisten: total laporan, jumlah laporan
+    prioritas (Q1/Q2), serta rasio importance & urgency tinggi (%).
+    """
     df_daily = get_df_from_delta("s3://gold/warehouse/gold.db/complaint_daily")
-    
     if df_daily.empty:
         return []
-        
-    # Group by kecamatan dan ambil metrik relevan
-    grouped = df_daily.groupby("kecamatan").agg({
-        "complaint_count": "sum",
-        "avg_importance": "mean",
-        "avg_urgency": "mean",
-        "quadrant": lambda x: x.value_counts().index[0] # kuadran dominan
-    }).reset_index()
-    
+
     result = []
-    for _, row in grouped.iterrows():
-        kec = row["kecamatan"].strip()
+    for kec, g in df_daily.groupby("kecamatan"):
+        kec = str(kec).strip()
+        total = int(g["complaint_count"].sum())
+        w = g["complaint_count"].clip(lower=1)
+        imp_ratio = float((g["importance_high_ratio"].fillna(0) * w).sum() / w.sum())
+        urg_ratio = float((g["urgency_high_ratio"].fillna(0) * w).sum() / w.sum())
+        # Warna peta = TINGKAT URGENSI kecamatan. Importance di data ini hampir
+        # selalu tinggi (semua dianggap penting), jadi yang benar-benar
+        # membedakan antar-kecamatan adalah urgency -> dipakai sebagai gradien
+        # warna biar peta informatif & gampang dibaca orang awam.
+        if urg_ratio >= 0.50:
+            tier, color, label = "T1", "#ef4444", "Sangat Mendesak"
+        elif urg_ratio >= 0.30:
+            tier, color, label = "T2", "#f97316", "Mendesak"
+        elif urg_ratio >= 0.15:
+            tier, color, label = "T3", "#eab308", "Cukup Mendesak"
+        else:
+            tier, color, label = "T4", "#3b82f6", "Kurang Mendesak"
+        q1q2 = int(g[g["quadrant"].isin(["Q1", "Q2"])]["complaint_count"].sum())
         coords = DISTRICT_COORDS.get(kec, DISTRICT_COORDS["Tidak Diketahui"])
-        color = QUADRANT_COLORS.get(row["quadrant"], "#00ffcc")
-        
-        # Peta prioritas: prioritas lebih tinggi jika Q1 (Urgent & Important)
-        priority_level = "Rendah"
-        if row["quadrant"] == "Q1":
-            priority_level = "Kritis (Q1)"
-        elif row["quadrant"] == "Q2":
-            priority_level = "Tinggi (Q2)"
-        elif row["quadrant"] == "Q3":
-            priority_level = "Sedang (Q3)"
-            
         result.append({
             "kecamatan": kec,
             "coords": coords,
-            "complaint_count": int(row["complaint_count"]),
-            "avg_importance": round(float(row["avg_importance"]), 2),
-            "avg_urgency": round(float(row["avg_urgency"]), 2),
-            "quadrant": row["quadrant"],
+            "complaint_count": total,
+            "priority_count": q1q2,
+            "importance_high_pct": round(imp_ratio * 100, 1),
+            "urgency_high_pct": round(urg_ratio * 100, 1),
+            "tier": tier,
             "color": color,
-            "priority_level": priority_level
+            "priority_level": label,
         })
-        
     return result
 
 @app.get("/api/enriched")
@@ -266,8 +281,8 @@ async def get_scatter():
     grouped = (
         df_daily.groupby(["kecamatan", "category"])
         .agg(
-            avg_urgency=("avg_urgency", "mean"),
-            avg_importance=("avg_importance", "mean"),
+            urg_ratio=("urgency_high_ratio", "mean"),
+            imp_ratio=("importance_high_ratio", "mean"),
             complaint_count=("complaint_count", "sum"),
             quadrant=("quadrant", lambda x: x.value_counts().index[0]),
         )
@@ -280,12 +295,14 @@ async def get_scatter():
         result.append({
             "kecamatan": row["kecamatan"],
             "category": row["category"].upper(),
-            "x": round(float(row["avg_urgency"]), 4),     # urgency on X
-            "y": round(float(row["avg_importance"]), 4),  # importance on Y
-            "r": max(5, min(30, int(row["complaint_count"]) * 1.5)),  # bubble radius
+            # Sumbu pakai RASIO (0-1) yang menentukan kuadran -> posisi titik
+            # konsisten dengan warnanya. x = % mendesak, y = % penting.
+            "x": round(float(row["urg_ratio"]), 4),
+            "y": round(float(row["imp_ratio"]), 4),
+            "r": max(6, min(28, 5 + int(row["complaint_count"]) * 1.4)),
             "complaint_count": int(row["complaint_count"]),
             "quadrant": q,
-            "color": QUADRANT_COLORS.get(q, "#00ffcc"),
+            "color": QUADRANT_COLORS.get(q, "#3b82f6"),
         })
     return result
 

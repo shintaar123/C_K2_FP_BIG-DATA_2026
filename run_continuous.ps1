@@ -19,7 +19,7 @@ $KAFKA_PKG = "$PKG,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3"
 
 # ─── INSTALL DEPENDENSI INGESTION & MLFLOW DI SPARK-MASTER ─────────────────────────
 Write-Host "Memastikan dependensi terinstall di spark-master..." -ForegroundColor Cyan
-docker compose exec spark-master bash -c "pip install --upgrade pip -q && pip install -q feedparser==6.0.11 kafka-python-ng==2.2.3 requests==2.32.3 beautifulsoup4==4.12.3 python-dotenv==1.0.1 mlflow-skinny==2.17.2 boto3"
+docker compose exec spark-master bash -c "pip install --upgrade pip -q && pip install -q feedparser==6.0.11 kafka-python-ng==2.2.3 requests==2.32.3 beautifulsoup4==4.12.3 python-dotenv==1.0.1 mlflow==2.17.2 boto3 urllib3==1.26.20"
 
 # ─── BACA .env UNTUK API KEY LLM ─────────────────────────────────────────────
 $envVars = @{}

@@ -3,6 +3,8 @@ reddit_scraper.py
 Scraper Reddit via PRAW (API resmi, gratis, stabil).
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import datetime

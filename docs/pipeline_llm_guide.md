@@ -1,7 +1,7 @@
 # Pipeline + LLM — Panduan Menjalankan
 
-Bagian **Pipeline + LLM Engineer**: Gold aggregation, LLM enrichment, integrasi
-end-to-end, dan Airflow ETL DAG. Dokumen ini menjelaskan alur dan cara menjalankan.
+Bagian **Pipeline + LLM Engineer**: Gold aggregation, LLM enrichment, dan integrasi
+end-to-end. Dokumen ini menjelaskan alur dan cara menjalankan.
 
 ## Alur Data End-to-End
 
@@ -54,25 +54,19 @@ docker compose exec -e GEMINI_API_KEY=ISI_KEY spark-master /opt/spark/bin/spark-
   /opt/spark/work-dir/llm/llm_enrichment.py
 ```
 
-## Menjalankan via Airflow
+## Menjalankan Otomatis (Loop)
 
-DAG yang sudah di-wire (lewat `spark_submit_helper` → exec ke spark-master):
+Untuk menjalankan seluruh tahap berulang otomatis (tanpa orkestrator terpisah),
+gunakan script `run_continuous`:
 
-| DAG | Jadwal | Tugas |
-|---|---|---|
-| `etl_pipeline_dag` | 08.00 harian | silver_transform → predict_batch → gold_aggregate |
-| `llm_enrichment_dag` | 10.00 harian | llm_enrichment (Gold Q1/Q2 → LLM-Gold) |
-| `ml_retrain_dag` | Senin 02.00 | retrain 3 classifier + log MLflow |
-
-API key LLM untuk DAG di-set sebagai **Airflow Variable** (`GEMINI_API_KEY`,
-`GROQ_API_KEY`, `CEREBRAS_API_KEY`) lewat Airflow UI → Admin → Variables, atau:
-
-```bash
-docker compose exec airflow-scheduler airflow variables set GEMINI_API_KEY "ISI_KEY"
+```powershell
+.\run_continuous.ps1 -IntervalSeconds 1800    # tiap 30 menit; Ctrl+C untuk stop
 ```
 
-> Airflow menjalankan Spark dengan `docker exec` ke container `spark-master`
-> (socket `/var/run/docker.sock` di-mount + paket `docker` di-install otomatis).
+Tiap siklus menjalankan: Ingestion → Bronze → Silver → Predict → Gold → LLM
+enrichment. API key LLM diambil dari `.env` dan diteruskan ke container Spark
+oleh script. (Model TIDAK dilatih ulang di loop ini — latih sekali di awal via
+`run_pipeline.ps1 -Train`.)
 
 ## Verifikasi via Trino
 

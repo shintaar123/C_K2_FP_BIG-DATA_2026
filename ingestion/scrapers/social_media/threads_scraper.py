@@ -13,6 +13,8 @@ gagal/diblokir. Karena itu scraper ini:
 Skema output = skema standar Bronze (lihat base_scraper.py).
 """
 
+from __future__ import annotations
+
 import os
 import sys
 

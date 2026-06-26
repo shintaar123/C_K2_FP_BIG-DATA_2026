@@ -7,6 +7,8 @@ Dipakai karena:
 Data dibuat realistis berdasarkan pola keluhan warga Surabaya nyata.
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import random

@@ -8,6 +8,8 @@ Cara jalanin manual buat testing (dari folder ingestion/):
     python -m scrapers.rss_scraper
 """
 
+from __future__ import annotations
+
 import re
 import sys
 import os

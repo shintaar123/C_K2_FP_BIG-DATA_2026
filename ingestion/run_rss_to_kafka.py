@@ -1,7 +1,7 @@
 """
 run_rss_to_kafka.py
 Entry point tunggal: scrape semua sumber RSS -> kirim ke Kafka topic 'raw-rss'.
-Ini file yang dipanggil Airflow (daily_scraping_dag.py) untuk task scrape_rss.
+Dipanggil oleh run_pipeline.ps1 / run_continuous (orkestrasi pipeline).
 
 Jalankan manual dari folder ingestion/:
     python run_rss_to_kafka.py

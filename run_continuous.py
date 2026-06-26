@@ -61,7 +61,7 @@ def main():
     print(f"\n{CYAN}[*] Sinkronisasi dependensi di dalam spark-master...{RESET}")
     pip_cmd = [
         "docker", "compose", "exec", "spark-master", "bash", "-c",
-        "pip install --upgrade pip -q --default-timeout=300 && pip install -q --default-timeout=300 feedparser==6.0.11 kafka-python-ng==2.2.3 requests==2.32.3 beautifulsoup4==4.12.3 python-dotenv==1.0.1 mlflow-skinny==2.17.2 boto3"
+        "pip install --upgrade pip -q --default-timeout=300 && pip install -q --default-timeout=300 feedparser==6.0.11 kafka-python-ng==2.2.3 requests==2.32.3 beautifulsoup4==4.12.3 python-dotenv==1.0.1 mlflow==2.17.2 boto3 urllib3==1.26.20"
     ]
     run_command(pip_cmd)
 

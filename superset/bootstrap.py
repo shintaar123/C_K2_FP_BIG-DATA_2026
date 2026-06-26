@@ -159,6 +159,36 @@ class SupersetClient:
 
 
 # ─── Step 1: Database (Trino) ────────────────────────────────────────────────
+def _find_database(client: SupersetClient) -> Optional[int]:
+    """Cari database by name. Coba filter dulu, fallback list-all + match manual.
+
+    Filter by name kadang return kosong di Superset 4.1.x walau DB-nya ada
+    (mis. karena perbedaan auth/permission saat resolve filter). Fallback
+    list-all lebih tahan banting supaya bootstrap idempoten.
+    """
+    try:
+        res = client.get(
+            "/api/v1/database/",
+            params={"q": json.dumps({"filters": [
+                {"col": "database_name", "opr": "eq", "value": DB_NAME}
+            ]})},
+        )
+        if res.get("count", 0) > 0:
+            return res["result"][0]["id"]
+    except Exception as e:
+        print(f"[db] filter lookup gagal ({e}), coba list-all.")
+
+    # Fallback: ambil semua database lalu cocokkan by name
+    try:
+        res = client.get("/api/v1/database/")
+        for d in res.get("result", []):
+            if d.get("database_name") == DB_NAME:
+                return d["id"]
+    except Exception as e:
+        print(f"[db] list-all lookup gagal ({e}).")
+    return None
+
+
 def ensure_database(client: SupersetClient) -> int:
     sqlalchemy_uri = (
         f"trino://{TRINO_USER}@{TRINO_HOST}:{TRINO_PORT}/{TRINO_CATALOG}"
@@ -166,12 +196,8 @@ def ensure_database(client: SupersetClient) -> int:
     print(f"[db] Memastikan database '{DB_NAME}' -> {sqlalchemy_uri}")
 
     # Cek dulu kalau sudah ada
-    existing = client.get(
-        "/api/v1/database/",
-        params={"q": json.dumps({"filters": [{"col": "database_name", "opr": "eq", "value": DB_NAME}]})},
-    )
-    if existing.get("count", 0) > 0:
-        db_id = existing["result"][0]["id"]
+    db_id = _find_database(client)
+    if db_id is not None:
         print(f"[db] Sudah ada (id={db_id}), skip create.")
         return db_id
 
@@ -182,17 +208,31 @@ def ensure_database(client: SupersetClient) -> int:
         "allow_ctas": False,
         "allow_cvas": False,
         "allow_dml": False,
-        "allow_run_async": True,
+        # Async = True butuh Celery worker + results backend (Redis). Stack ini
+        # tidak punya keduanya, jadi SQL Lab gagal dgn "Failed to start remote
+        # query on a worker". Set False -> query jalan sinkron langsung. 
+        "allow_run_async": False,
         "extra": json.dumps({
             "metadata_params": {},
             "engine_params": {},
             "schemas_allowed_for_file_upload": [],
         }),
     }
-    res = client.post("/api/v1/database/", body)
-    db_id = res["id"]
-    print(f"[db] Created (id={db_id})")
-    return db_id
+    try:
+        res = client.post("/api/v1/database/", body)
+        db_id = res["id"]
+        print(f"[db] Created (id={db_id})")
+        return db_id
+    except requests.HTTPError as e:
+        # 422 "already exists" -> race / filter miss. Re-fetch id-nya.
+        status = e.response.status_code if e.response is not None else None
+        if status == 422:
+            print("[db] Create kena 422 (sudah ada), ambil id existing.")
+            db_id = _find_database(client)
+            if db_id is not None:
+                print(f"[db] Pakai existing (id={db_id}).")
+                return db_id
+        raise
 
 
 # ─── Step 2: Datasets ────────────────────────────────────────────────────────
@@ -244,6 +284,12 @@ def _find_chart(client: SupersetClient, name: str) -> Optional[int]:
     return None
 
 
+# Registry viz_type & nama per chart id -> dipakai _build_position_json untuk
+# menata layout rapi (KPI kecil di atas, chart lebar penuh, dst).
+CHART_VIZ: Dict[int, str] = {}
+CHART_NAME: Dict[int, str] = {}
+
+
 def create_chart(
     client: SupersetClient,
     name: str,
@@ -255,6 +301,8 @@ def create_chart(
     cid = _find_chart(client, name)
     if cid:
         print(f"[chart] '{name}' sudah ada (id={cid}), skip.")
+        CHART_VIZ[cid] = viz_type
+        CHART_NAME[cid] = name
         return cid
 
     params_with_ds = {**params, "datasource": f"{dataset_id}__table", "viz_type": viz_type}
@@ -271,6 +319,8 @@ def create_chart(
         res = client.post("/api/v1/chart/", body)
         cid = res["id"]
         print(f"[chart] '{name}' created (id={cid})")
+        CHART_VIZ[cid] = viz_type
+        CHART_NAME[cid] = name
         return cid
     except Exception as e:
         print(f"[chart] '{name}' GAGAL dibuat: {e}. Lanjut chart berikutnya.")
@@ -317,10 +367,11 @@ def build_charts(client: SupersetClient, ds_daily: int, ds_enriched: int) -> Lis
     if cid:
         chart_ids.append(cid)
 
-    # ── 3) Top Kecamatan (Bar) ──────────────────────────────────────────────
+    # ── 3) Top Kecamatan (Bar — ECharts modern, didukung Superset 4.1) ──────
     bar_kec_params = {
-        "groupby": ["kecamatan"],
+        "x_axis": "kecamatan",
         "metrics": [_metric_simple("complaint_count", "BIGINT", "SUM")],
+        "groupby": [],
         "adhoc_filters": [
             {
                 "expressionType": "SIMPLE",
@@ -334,25 +385,28 @@ def build_charts(client: SupersetClient, ds_daily: int, ds_enriched: int) -> Lis
         "order_desc": True,
         "show_legend": False,
         "color_scheme": "supersetColors",
+        "x_axis_sort_asc": False,
     }
     cid = create_chart(
-        client, "Top Kecamatan (Total Keluhan)", "dist_bar", ds_daily, bar_kec_params
+        client, "Top Kecamatan (Total Keluhan)", "echarts_timeseries_bar", ds_daily, bar_kec_params
     )
     if cid:
         chart_ids.append(cid)
 
-    # ── 4) Sebaran Kategori (Bar) ───────────────────────────────────────────
+    # ── 4) Sebaran Kategori (Bar — ECharts modern) ─────────────────────────
     bar_cat_params = {
-        "groupby": ["category"],
+        "x_axis": "category",
         "metrics": [_metric_simple("complaint_count", "BIGINT", "SUM")],
+        "groupby": [],
         "adhoc_filters": [],
         "row_limit": 20,
         "order_desc": True,
         "show_legend": False,
         "color_scheme": "supersetColors",
+        "x_axis_sort_asc": False,
     }
     cid = create_chart(
-        client, "Sebaran Kategori", "dist_bar", ds_daily, bar_cat_params
+        client, "Sebaran Kategori", "echarts_timeseries_bar", ds_daily, bar_cat_params
     )
     if cid:
         chart_ids.append(cid)
@@ -415,11 +469,11 @@ def build_charts(client: SupersetClient, ds_daily: int, ds_enriched: int) -> Lis
     if cid:
         chart_ids.append(cid)
 
-    # ── 8) Heatmap Kecamatan × Kategori ─────────────────────────────────────
-    heatmap_params = {
-        "all_columns_x": "kecamatan",
-        "all_columns_y": "category",
-        "metric": _metric_simple("complaint_count", "BIGINT", "SUM"),
+    # ── 8) Keluhan per Kecamatan & Kategori (Stacked Bar — ganti heatmap legacy) ──
+    stacked_params = {
+        "x_axis": "kecamatan",
+        "metrics": [_metric_simple("complaint_count", "BIGINT", "SUM")],
+        "groupby": ["category"],
         "adhoc_filters": [
             {
                 "expressionType": "SIMPLE",
@@ -430,20 +484,13 @@ def build_charts(client: SupersetClient, ds_daily: int, ds_enriched: int) -> Lis
             }
         ],
         "row_limit": 1000,
-        "linear_color_scheme": "schemeRdYlBu",
-        "xscale_interval": 1,
-        "yscale_interval": 1,
-        "canvas_image_rendering": "pixelated",
-        "normalize_across": "heatmap",
-        "left_margin": "auto",
-        "bottom_margin": "auto",
-        "y_axis_bounds": [None, None],
-        "y_axis_format": "SMART_NUMBER",
         "show_legend": True,
-        "show_perc": True,
+        "color_scheme": "supersetColors",
+        "stack": "Stack",
+        "x_axis_sort_asc": False,
     }
     cid = create_chart(
-        client, "Heatmap Kecamatan x Kategori", "heatmap", ds_daily, heatmap_params
+        client, "Keluhan per Kecamatan-Kategori", "echarts_timeseries_bar", ds_daily, stacked_params
     )
     if cid:
         chart_ids.append(cid)
@@ -481,16 +528,20 @@ def build_charts(client: SupersetClient, ds_daily: int, ds_enriched: int) -> Lis
 
 # ─── Step 4: Dashboard ───────────────────────────────────────────────────────
 def _build_position_json(chart_ids: List[int]) -> Dict[str, Any]:
-    """Bangun position_json dashboard sederhana: header + grid 2 kolom.
+    """Bangun position_json dashboard yang RAPI berdasarkan jenis chart.
 
-    Format Superset position_json: tree dengan ROOT_ID -> GRID_ID -> rows -> charts.
-    Ini implementasi minimal yang valid dan dapat di-render Superset.
+    Layout:
+      Row 0  : Big number KPI (height kecil, dibagi rata) 
+      Row 1  : Tren Harian / line chart  -> full width
+      Row 2+ : chart "biasa" (pie/bar/scatter) -> 2 kolom per baris
+      Akhir  : heatmap & tabel -> full width (butuh ruang lebar)
+
+    Format Superset position_json: tree ROOT_ID -> GRID_ID -> rows -> charts.
     """
-    rows: List[str] = []
     children: Dict[str, Any] = {
         "DASHBOARD_VERSION_KEY": "v2",
         "ROOT_ID": {"type": "ROOT", "id": "ROOT_ID", "children": ["GRID_ID"]},
-        "GRID_ID": {"type": "GRID", "id": "GRID_ID", "children": rows, "parents": ["ROOT_ID"]},
+        "GRID_ID": {"type": "GRID", "id": "GRID_ID", "children": [], "parents": ["ROOT_ID"]},
         "HEADER_ID": {
             "type": "HEADER",
             "id": "HEADER_ID",
@@ -498,27 +549,32 @@ def _build_position_json(chart_ids: List[int]) -> Dict[str, Any]:
             "parents": ["ROOT_ID"],
         },
     }
+    rows: List[str] = children["GRID_ID"]["children"]
+    row_counter = {"n": 0}
 
-    # Tata letak: 2 chart per row, 6 unit width tiap chart (total 12)
-    row_idx = 0
-    for i in range(0, len(chart_ids), 2):
-        row_id = f"ROW-{row_idx}"
+    def _add_row(items: List[Dict[str, Any]]) -> None:
+        """items: list of {'id':cid, 'w':width, 'h':height}."""
+        if not items:
+            return
+        row_id = f"ROW-{row_counter['n']}"
+        row_counter["n"] += 1
         row_children: List[str] = []
-        for j, cid in enumerate(chart_ids[i : i + 2]):
-            chart_node_id = f"CHART-{cid}"
-            children[chart_node_id] = {
+        for it in items:
+            cid = it["id"]
+            node_id = f"CHART-{cid}"
+            children[node_id] = {
                 "type": "CHART",
-                "id": chart_node_id,
+                "id": node_id,
                 "children": [],
                 "parents": ["ROOT_ID", "GRID_ID", row_id],
                 "meta": {
                     "chartId": cid,
-                    "width": 6,
-                    "height": 50,
-                    "sliceName": f"chart-{cid}",
+                    "width": it["w"],
+                    "height": it["h"],
+                    "sliceName": CHART_NAME.get(cid, f"chart-{cid}"),
                 },
             }
-            row_children.append(chart_node_id)
+            row_children.append(node_id)
         children[row_id] = {
             "type": "ROW",
             "id": row_id,
@@ -527,7 +583,38 @@ def _build_position_json(chart_ids: List[int]) -> Dict[str, Any]:
             "meta": {"background": "BACKGROUND_TRANSPARENT"},
         }
         rows.append(row_id)
-        row_idx += 1
+
+    # Klasifikasi chart berdasar viz_type (jaga urutan asli)
+    kpis, fullwidth_top, normals, fullwidth_bottom = [], [], [], []
+    for cid in chart_ids:
+        viz = CHART_VIZ.get(cid, "")
+        if viz in ("big_number_total", "big_number"):
+            kpis.append(cid)
+        elif viz in ("echarts_timeseries_line", "line"):
+            fullwidth_top.append(cid)
+        elif viz in ("heatmap", "table"):
+            fullwidth_bottom.append(cid)
+        else:
+            normals.append(cid)
+
+    # Row 0: KPI big numbers, dibagi rata (min width 3 biar tidak gepeng)
+    if kpis:
+        w = max(3, 12 // len(kpis))
+        _add_row([{"id": c, "w": w, "h": 20} for c in kpis])
+
+    # Row 1: line chart full width
+    for c in fullwidth_top:
+        _add_row([{"id": c, "w": 12, "h": 50}])
+
+    # Row 2+: chart biasa, 2 per baris (width 6)
+    for i in range(0, len(normals), 2):
+        pair = normals[i : i + 2]
+        _add_row([{"id": c, "w": 6, "h": 50} for c in pair])
+
+    # Akhir: heatmap & tabel full width (butuh ruang lebar)
+    for c in fullwidth_bottom:
+        h = 60 if CHART_VIZ.get(c) == "table" else 55
+        _add_row([{"id": c, "w": 12, "h": h}])
 
     return children
 

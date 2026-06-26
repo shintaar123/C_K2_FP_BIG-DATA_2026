@@ -85,7 +85,7 @@
             "type": "trino-datasource",
             "uid": "trino-surabaya"
           },
-          "format": "table",
+          "format": 1,
           "rawSql": "SELECT COALESCE(SUM(complaint_count), 0) AS q1_total FROM delta.gold.complaint_daily WHERE quadrant = 'Q1'",
           "refId": "A"
         }
@@ -155,7 +155,7 @@
             "type": "trino-datasource",
             "uid": "trino-surabaya"
           },
-          "format": "table",
+          "format": 1,
           "rawSql": "SELECT COALESCE(SUM(complaint_count), 0) AS q2_total FROM delta.gold.complaint_daily WHERE quadrant = 'Q2'",
           "refId": "A"
         }
@@ -225,7 +225,7 @@
             "type": "trino-datasource",
             "uid": "trino-surabaya"
           },
-          "format": "table",
+          "format": 1,
           "rawSql": "SELECT COUNT(*) AS anomaly_count FROM delta.gold.complaint_daily WHERE is_anomaly = true",
           "refId": "A"
         }
@@ -287,7 +287,7 @@
             "type": "trino-datasource",
             "uid": "trino-surabaya"
           },
-          "format": "table",
+          "format": 1,
           "rawSql": "SELECT COALESCE(SUM(complaint_count), 0) AS total FROM delta.gold.complaint_daily",
           "refId": "A"
         }
@@ -418,7 +418,7 @@
             "type": "trino-datasource",
             "uid": "trino-surabaya"
           },
-          "format": "table",
+          "format": 1,
           "rawSql": "SELECT quadrant, SUM(complaint_count) AS total FROM delta.gold.complaint_daily GROUP BY quadrant ORDER BY quadrant",
           "refId": "A"
         }
@@ -515,7 +515,7 @@
             "type": "trino-datasource",
             "uid": "trino-surabaya"
           },
-          "format": "table",
+          "format": 1,
           "rawSql": "SELECT kecamatan, SUM(complaint_count) AS total FROM delta.gold.complaint_daily WHERE kecamatan <> 'Tidak Diketahui' GROUP BY kecamatan ORDER BY total DESC LIMIT 10",
           "refId": "A"
         }
@@ -668,7 +668,7 @@
             "type": "trino-datasource",
             "uid": "trino-surabaya"
           },
-          "format": "time_series",
+          "format": 0,
           "rawSql": "SELECT CAST(date AS TIMESTAMP) AS time, quadrant AS metric, SUM(complaint_count) AS value FROM delta.gold.complaint_daily GROUP BY date, quadrant ORDER BY date",
           "refId": "A"
         }
@@ -765,7 +765,7 @@
             "type": "trino-datasource",
             "uid": "trino-surabaya"
           },
-          "format": "table",
+          "format": 1,
           "rawSql": "SELECT category, SUM(complaint_count) AS total FROM delta.gold.complaint_daily GROUP BY category ORDER BY total DESC",
           "refId": "A"
         }
@@ -910,7 +910,7 @@
             "type": "trino-datasource",
             "uid": "trino-surabaya"
           },
-          "format": "table",
+          "format": 1,
           "rawSql": "SELECT priority_rank, kecamatan, category, quadrant, complaint_count, llm_priority_score, llm_summary FROM delta.gold.complaint_enriched ORDER BY priority_rank LIMIT 15",
           "refId": "A"
         }

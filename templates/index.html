@@ -1,1342 +1,573 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Surabaya Local Disaster Complaint Dashboard</title>
-    <!-- Google Fonts: Outfit & Space Grotesk -->
+    <title>Surabaya EWS — Dashboard Pengaduan Warga</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Leaflet CSS for Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <!-- Chart.js for beautiful charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root {
-            --bg-base: #0a0714;
-            --bg-panel: rgba(14, 11, 26, 0.55);
-            --bg-card: rgba(22, 18, 38, 0.65);
-            --bg-card-hover: rgba(30, 25, 52, 0.85);
-            --border-glow: rgba(255, 255, 255, 0.07);
-            --border-glow-active: rgba(139, 92, 246, 0.4);
-            
-            --text-primary: #f3f1f7;
-            --text-secondary: #a19bb3;
-            --text-muted: #6e6782;
-            
-            --primary: #8b5cf6; /* Indigo Glow */
-            --primary-glow: rgba(139, 92, 246, 0.3);
-            
-            --color-q1: #ff0055; /* Neon Red-Pink */
-            --color-q2: #ff7700; /* Neon Orange */
-            --color-q3: #ffcc00; /* Neon Yellow */
-            --color-q4: #00aaff; /* Neon Blue */
+            --bg:#eef2f8; --surface:#ffffff; --surface-2:#f6f8fc; --border:#e6eaf1;
+            --text:#1f2a3d; --text-soft:#5b6779; --text-mut:#97a1b2;
+            --primary:#4f46e5; --primary-2:#6366f1; --primary-soft:#eef0ff;
+            --q1:#ef4444; --q2:#f97316; --q3:#eab308; --q4:#3b82f6; --green:#10b981;
+            --shadow-sm:0 1px 2px rgba(20,30,50,.04),0 2px 8px rgba(20,30,50,.05);
+            --shadow-md:0 6px 20px rgba(20,30,50,.08);
+            --map-filter:none;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Outfit', sans-serif;
-            scrollbar-width: thin;
-            scrollbar-color: var(--text-muted) transparent;
+        [data-theme="dark"] {
+            --bg:#0e1420; --surface:#161e2c; --surface-2:#1c2636; --border:#28324a;
+            --text:#e8edf6; --text-soft:#9aa7bd; --text-mut:#6b788f;
+            --primary:#818cf8; --primary-2:#6366f1; --primary-soft:#1e2440;
+            --shadow-sm:0 1px 2px rgba(0,0,0,.25),0 2px 8px rgba(0,0,0,.3);
+            --shadow-md:0 6px 22px rgba(0,0,0,.4);
         }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: var(--text-muted);
-            border-radius: 10px;
-        }
-
+        * { box-sizing:border-box; margin:0; padding:0; }
         body {
-            background: var(--bg-base);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow: hidden;
-            display: flex;
-            position: relative;
+            font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text);
+            font-size:14px; -webkit-font-smoothing:antialiased; min-height:100vh; display:flex;
+            transition:background .25s ease, color .25s ease;
         }
+        .num { font-family:'Space Grotesk',sans-serif; font-feature-settings:"tnum"; }
+        ::-webkit-scrollbar { width:9px; height:9px; }
+        ::-webkit-scrollbar-thumb { background:var(--border); border-radius:10px; }
+        a { color:inherit; text-decoration:none; }
 
-        /* Background glowing blobs */
-        .glow-blob {
-            position: absolute;
-            width: 500px;
-            height: 500px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, rgba(0, 0, 0, 0) 70%);
-            filter: blur(80px);
-            z-index: 0;
-            pointer-events: none;
-        }
-        .blob-1 { top: -10%; left: -10%; }
-        .blob-2 { bottom: -10%; right: -10%; }
-
-        /* Container Layout */
-        .app-container {
-            display: flex;
-            width: 100vw;
-            height: 100vh;
-            z-index: 1;
-            position: relative;
-        }
-
-        /* SIDEBAR (Left Panel) */
+        /* ── SIDEBAR ─────────────────────────────────────────── */
         .sidebar {
-            width: 33%;
-            min-width: 420px;
-            max-width: 480px;
-            height: 100%;
-            background: var(--bg-panel);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            border-right: 1px solid var(--border-glow);
-            display: flex;
-            flex-direction: column;
-            padding: 24px;
-            z-index: 10;
+            width:236px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border);
+            display:flex; flex-direction:column; padding:20px 14px; position:sticky; top:0; height:100vh;
+            transition:background .25s ease;
         }
+        .brand { display:flex; align-items:center; gap:11px; padding:0 8px 20px; }
+        .brand .logo { width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,var(--primary),var(--primary-2)); display:grid; place-items:center; color:#fff; font-size:17px; box-shadow:0 6px 16px rgba(79,70,229,.32); }
+        .brand h1 { font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:700; letter-spacing:-.3px; }
+        .brand p { font-size:11px; color:var(--text-mut); }
+        .nav { display:flex; flex-direction:column; gap:4px; flex:1; }
+        .nav-label { font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--text-mut); padding:12px 12px 6px; }
+        .nav-item {
+            display:flex; align-items:center; gap:12px; padding:11px 13px; border-radius:11px;
+            color:var(--text-soft); font-weight:500; font-size:13.5px; cursor:pointer; transition:all .15s ease; border:none; background:transparent; width:100%; text-align:left; font-family:inherit;
+        }
+        .nav-item i { width:18px; text-align:center; font-size:15px; }
+        .nav-item:hover { background:var(--surface-2); color:var(--text); }
+        .nav-item.active { background:var(--primary-soft); color:var(--primary); font-weight:600; }
+        .nav-foot { border-top:1px solid var(--border); padding-top:12px; }
+        .theme-toggle {
+            display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 13px;
+            border-radius:11px; background:var(--surface-2); color:var(--text-soft); cursor:pointer; border:none; width:100%; font-family:inherit; font-size:13px; font-weight:500;
+        }
+        .theme-toggle:hover { color:var(--text); }
 
-        .header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-        .header img {
-            width: 36px;
-            height: 36px;
-        }
-        .header h1 {
-            font-size: 20px;
-            font-weight: 700;
-            font-family: 'Space Grotesk', sans-serif;
-            background: linear-gradient(90deg, #fff, var(--text-secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .header .badge {
-            background: rgba(139, 92, 246, 0.15);
-            color: #a78bfa;
-            border: 1px solid rgba(139, 92, 246, 0.3);
-            font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 20px;
-            font-weight: 600;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
+        /* ── MAIN ────────────────────────────────────────────── */
+        .main { flex:1; min-width:0; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+        .topbar { display:flex; align-items:center; gap:16px; padding:16px 24px; border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; transition:background .25s ease; }
+        .topbar h2 { font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700; }
+        .topbar .pg-sub { font-size:12px; color:var(--text-mut); }
+        .search { margin-left:auto; display:flex; align-items:center; gap:9px; background:var(--surface-2); border:1px solid var(--border); border-radius:11px; padding:9px 13px; width:300px; transition:border-color .2s, box-shadow .2s; }
+        .search:focus-within { border-color:var(--primary-2); box-shadow:0 0 0 3px rgba(99,102,241,.14); }
+        .search i { color:var(--text-mut); font-size:13px; }
+        .search input { border:none; outline:none; background:transparent; color:var(--text); width:100%; font-size:13px; }
+        .live { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--green); background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.25); padding:8px 12px; border-radius:10px; white-space:nowrap; }
+        .live .dot { width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse 1.6s infinite; }
+        @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(16,185,129,.5);} 70%{box-shadow:0 0 0 6px rgba(16,185,129,0);} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0);} }
 
-        /* METRIC CARDS */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-        .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-glow);
-            border-radius: 16px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            transition: all 0.3s ease;
-        }
-        .stat-card:hover {
-            border-color: rgba(255, 255, 255, 0.15);
-            transform: translateY(-2px);
-        }
-        .stat-card .label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .stat-card .value {
-            font-size: 24px;
-            font-weight: 700;
-            color: #fff;
-            font-family: 'Space Grotesk', sans-serif;
-        }
-        .stat-card .subtext {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
+        .content { flex:1; overflow-y:auto; padding:22px 24px; }
+        .page { display:none; }
+        .page.active { display:block; animation:fade .25s ease; }
+        @keyframes fade { from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
 
-        /* COMPLAINT LIST */
-        .insights-section {
-            flex-grow: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-        .section-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .section-title span.pulse-indicator {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 10px;
-            color: #10b981; /* Neon green */
-        }
-        .section-title span.pulse-indicator .dot {
-            width: 6px;
-            height: 6px;
-            background: #10b981;
-            border-radius: 50%;
-            animation: pulse-green 1.5s infinite;
-        }
+        /* ── CARDS / GRID ────────────────────────────────────── */
+        .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); padding:17px 19px; display:flex; flex-direction:column; min-height:0; transition:background .25s ease, border-color .25s ease; }
+        .card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-shrink:0; }
+        .card-head .ttl { display:flex; align-items:center; gap:9px; font-weight:600; font-size:14px; }
+        .card-head .ttl i { color:var(--primary); }
+        .card-head .hint { font-size:11px; color:var(--text-mut); }
+        .chart-wrap { position:relative; flex:1; min-height:220px; }
 
-        /* GLASS CARD COMPLAINT */
-        .insight-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-glow);
-            border-radius: 18px;
-            padding: 18px;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-        .insight-card:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--border-glow-active);
-            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.15);
-            transform: translateY(-2px);
-        }
-        .insight-card::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            height: 100%;
-            width: 4px;
-            background: var(--color-q4);
-        }
-        .insight-card.q1::before { background: var(--color-q1); }
-        .insight-card.q2::before { background: var(--color-q2); }
-        .insight-card.q3::before { background: var(--color-q3); }
+        .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:18px; }
+        .kpi { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:18px; box-shadow:var(--shadow-sm); position:relative; overflow:hidden; transition:transform .18s ease, box-shadow .18s ease, background .25s ease; }
+        .kpi:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); }
+        .kpi::before { content:''; position:absolute; left:0; top:0; height:100%; width:4px; background:var(--accent,var(--primary)); }
+        .kpi .ico { width:38px; height:38px; border-radius:11px; display:grid; place-items:center; font-size:16px; margin-bottom:13px; background:color-mix(in srgb, var(--accent,var(--primary)) 15%, transparent); color:var(--accent,var(--primary)); }
+        .kpi .label { font-size:12.5px; color:var(--text-soft); font-weight:500; }
+        .kpi .value { font-size:27px; font-weight:700; letter-spacing:-.5px; margin:3px 0; }
+        .kpi .sub { font-size:11.5px; color:var(--text-mut); }
+        .k-total{--accent:var(--primary);} .k-crit{--accent:var(--q1);} .k-eta{--accent:var(--q4);} .k-area{--accent:var(--q2);}
 
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 10px;
-        }
-        .district-name {
-            font-size: 15px;
-            font-weight: 700;
-            color: #fff;
-        }
-        .category-badge {
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-secondary);
-            font-size: 10px;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            letter-spacing: 0.5px;
-        }
+        .grid2 { display:grid; grid-template-columns:1.6fr 1fr; gap:16px; margin-bottom:16px; }
+        .grid2b { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+        .gh-360 { height:360px; } .gh-320 { height:320px; } .gh-300 { height:300px; }
 
-        .ai-summary {
-            font-size: 13px;
-            color: var(--text-secondary);
-            line-height: 1.5;
-            margin-bottom: 12px;
-        }
+        /* RISK bars */
+        .risk-row { margin-bottom:16px; }
+        .risk-row .top { display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-soft); margin-bottom:7px; }
+        .risk-row .top b { color:var(--text); font-weight:700; }
+        .bar { height:9px; background:var(--surface-2); border-radius:8px; overflow:hidden; }
+        .bar .fill { height:100%; border-radius:8px; transition:width .7s cubic-bezier(.4,0,.2,1); }
+        .fill.imp { background:linear-gradient(90deg,var(--q2),var(--q1)); }
+        .fill.urg { background:linear-gradient(90deg,var(--q4),var(--q3)); }
+        .badge { font-size:11px; font-weight:600; padding:3px 10px; border-radius:20px; }
+        .badge.up{background:rgba(239,68,68,.13);color:var(--q1);} .badge.flat{background:rgba(59,130,246,.13);color:var(--q4);} .badge.down{background:rgba(16,185,129,.14);color:var(--green);}
 
-        .card-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-top: 1px solid rgba(255, 255, 255, 0.04);
-            padding-top: 10px;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-        .meta-tag {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .meta-tag.complexity {
-            color: #a78bfa;
-            font-weight: 500;
-        }
-        .meta-tag.eta {
-            color: #38bdf8;
-        }
+        /* MAP */
+        #map { width:100%; height:100%; border-radius:12px; z-index:1; filter:var(--map-filter); }
+        .map-page-wrap { height:calc(100vh - 150px); }
+        .legend-inline { display:flex; gap:14px; flex-wrap:wrap; }
+        .legend-inline .li { display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-soft); }
+        .legend-inline .sw { width:10px; height:10px; border-radius:50%; }
 
-        /* LLM RECOMMENDATION WINDOW (POPUP/DRAWER) */
-        .action-btn {
-            background: rgba(139, 92, 246, 0.1);
-            color: #c084fc;
-            border: 1px solid rgba(139, 92, 246, 0.3);
-            border-radius: 6px;
-            padding: 4px 8px;
-            font-size: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .action-btn:hover {
-            background: var(--primary);
-            color: #fff;
-            box-shadow: 0 0 10px var(--primary-glow);
-        }
+        /* ANOMALY */
+        .anomaly { display:none; align-items:center; gap:12px; margin-bottom:16px; background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.3); border-radius:13px; padding:13px 16px; }
+        .anomaly i { color:var(--q1); font-size:19px; }
+        .anomaly .t { font-size:13px; color:var(--text-soft); } .anomaly .t strong { color:var(--q1); }
 
-        /* MAIN AREA (Right Panel) */
-        .main-content {
-            flex-grow: 1;
-            height: 100%;
-            position: relative;
-        }
+        /* INSIGHT CARDS (Rekomendasi AI page) */
+        .ai-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+        .insight { background:var(--surface); border:1px solid var(--border); border-radius:15px; padding:17px 18px; position:relative; overflow:hidden; box-shadow:var(--shadow-sm); transition:transform .16s ease, box-shadow .16s ease; }
+        .insight:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); }
+        .insight::before { content:''; position:absolute; left:0; top:0; height:100%; width:4px; background:var(--q4); }
+        .insight.q1::before{background:var(--q1);} .insight.q2::before{background:var(--q2);} .insight.q3::before{background:var(--q3);}
+        .insight .ih { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:4px; }
+        .insight .kec { font-size:15.5px; font-weight:700; }
+        .insight .rank { font-size:11px; color:var(--text-mut); font-weight:600; }
+        .pill { font-size:10px; font-weight:700; letter-spacing:.4px; padding:3px 9px; border-radius:20px; color:#fff; }
+        .insight .meta-line { display:flex; align-items:center; gap:8px; margin:8px 0 12px; flex-wrap:wrap; }
+        .chip { font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:7px; background:var(--surface-2); color:var(--text-soft); border:1px solid var(--border); }
+        .insight .sum { font-size:13px; color:var(--text-soft); line-height:1.55; margin-bottom:12px; }
+        .insight .rec { background:var(--primary-soft); border:1px dashed color-mix(in srgb,var(--primary) 40%, transparent); border-radius:11px; padding:12px 13px; font-size:12.5px; line-height:1.55; color:var(--text); }
+        .insight .rec .rl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--primary); margin-bottom:5px; display:block; }
+        .insight .foot { display:flex; align-items:center; justify-content:space-between; margin-top:12px; padding-top:11px; border-top:1px solid var(--border); font-size:11.5px; color:var(--text-mut); }
+        .pscore { display:flex; align-items:center; gap:6px; font-weight:700; color:var(--primary); }
 
-        /* LEAFLET MAP */
-        #map {
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
+        .empty { text-align:center; padding:60px 20px; color:var(--text-mut); }
+        .empty i { font-size:30px; color:var(--primary); margin-bottom:14px; display:block; }
 
-        /* FLOATING OVERLAYS ON MAP */
-        .map-overlay {
-            position: absolute;
-            z-index: 5;
-            pointer-events: auto;
-        }
+        /* leaflet popup theme */
+        .leaflet-popup-content-wrapper { background:var(--surface) !important; color:var(--text) !important; border-radius:12px !important; box-shadow:var(--shadow-md) !important; }
+        .leaflet-popup-tip { background:var(--surface) !important; }
+        .pop-h { font-weight:700; font-size:13.5px; margin-bottom:7px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+        .pop-r { display:flex; justify-content:space-between; gap:18px; font-size:12px; margin-bottom:3px; color:var(--text-soft); }
+        .pop-r strong { color:var(--text); }
 
-        /* Top Bar Filter Overlay */
-        .top-bar {
-            top: 24px;
-            left: 24px;
-            right: 24px;
-            display: flex;
-            justify-content: space-between;
-            pointer-events: none;
-        }
-        .search-box {
-            background: rgba(15, 11, 28, 0.85);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid var(--border-glow);
-            border-radius: 14px;
-            padding: 10px 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            width: 320px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            pointer-events: auto;
-        }
-        .search-box input {
-            background: transparent;
-            border: none;
-            outline: none;
-            color: #fff;
-            font-size: 13px;
-            width: 100%;
-        }
-        .search-box input::placeholder {
-            color: var(--text-muted);
-        }
-
-        /* Legend Panel */
-        .legend-card {
-            top: 24px;
-            right: 24px;
-            background: rgba(15, 11, 28, 0.85);
-            backdrop-filter: blur(15px);
-            border: 1px solid var(--border-glow);
-            border-radius: 16px;
-            padding: 14px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            pointer-events: auto;
-        }
-        .legend-title {
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-        }
-        .legend-item:last-child { margin-bottom: 0; }
-        .legend-color {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-        }
-
-        /* Bottom Right Widget (Charts) */
-        .bottom-widget {
-            bottom: 24px;
-            right: 24px;
-            width: 340px;
-            background: rgba(15, 11, 28, 0.85);
-            backdrop-filter: blur(15px);
-            border: 1px solid var(--border-glow);
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-            pointer-events: auto;
-        }
-        .bottom-widget-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        /* MODAL WINDOW FOR RECOMMENDATIONS */
-        .modal-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(6, 4, 12, 0.8);
-            backdrop-filter: blur(8px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            opacity: 0;
-            pointer-events: none;
-            transition: all 0.3s ease;
-        }
-        .modal-backdrop.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .modal-card {
-            width: 90%;
-            max-width: 550px;
-            background: #110e20;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 28px;
-            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7);
-            transform: scale(0.95);
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .modal-backdrop.active .modal-card {
-            transform: scale(1);
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .modal-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .close-modal-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 18px;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-        .close-modal-btn:hover { color: #fff; }
-        
-        .modal-content-body {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .modal-section-title {
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 6px;
-        }
-        .modal-recommendation-box {
-            background: rgba(139, 92, 246, 0.06);
-            border: 1px dashed rgba(139, 92, 246, 0.3);
-            border-radius: 12px;
-            padding: 14px;
-            color: #e9d5ff;
-            font-size: 13.5px;
-            line-height: 1.6;
-        }
-
-        /* animations */
-        @keyframes pulse-green {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.3); opacity: 0.5; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0.55); }
-            70% { box-shadow: 0 0 0 8px rgba(255, 0, 85, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0); }
-        }
-
-        /* ANOMALY ALERT BANNER (top of sidebar) */
-        .anomaly-banner {
-            display: none;            /* shown by JS when anomaly_count > 0 */
-            align-items: center;
-            gap: 12px;
-            background: linear-gradient(135deg,
-                rgba(255, 0, 85, 0.18) 0%,
-                rgba(255, 119, 0, 0.12) 100%);
-            border: 1px solid rgba(255, 0, 85, 0.45);
-            border-radius: 14px;
-            padding: 12px 14px;
-            margin-bottom: 16px;
-            animation: pulse-red 2s infinite;
-        }
-        .anomaly-banner .icon {
-            font-size: 20px;
-            color: var(--color-q1);
-        }
-        .anomaly-banner .text {
-            flex: 1;
-            font-size: 12.5px;
-            color: var(--text-primary);
-            line-height: 1.4;
-        }
-        .anomaly-banner .text strong {
-            color: var(--color-q1);
-            font-weight: 700;
-        }
-
-        /* IMPORTANCE/URGENCY RATIO BARS (sidebar) */
-        .ratio-section {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 20px;
-            padding: 14px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-glow);
-            border-radius: 14px;
-        }
-        .ratio-section-title {
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 2px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .ratio-section-title .growth {
-            font-size: 10px;
-            font-weight: 600;
-            padding: 2px 8px;
-            border-radius: 10px;
-            text-transform: none;
-            letter-spacing: 0;
-        }
-        .growth.up { background: rgba(255, 0, 85, 0.15); color: #ff6699; border: 1px solid rgba(255, 0, 85, 0.3); }
-        .growth.flat { background: rgba(56, 189, 248, 0.12); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.25); }
-        .growth.down { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
-
-        .ratio-row {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .ratio-row .label-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 11.5px;
-            color: var(--text-secondary);
-        }
-        .ratio-row .label-row b { color: #fff; font-family: 'Space Grotesk', sans-serif; }
-        .ratio-bar {
-            height: 6px;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 6px;
-            overflow: hidden;
-            position: relative;
-        }
-        .ratio-bar .fill {
-            height: 100%;
-            border-radius: 6px;
-            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .ratio-bar .fill.importance {
-            background: linear-gradient(90deg, var(--color-q2), var(--color-q1));
-        }
-        .ratio-bar .fill.urgency {
-            background: linear-gradient(90deg, var(--color-q4), var(--color-q3));
-        }
-
-        /* SCATTER 4-QUADRANT WIDGET (floating bottom-left on map) */
-        .scatter-widget {
-            bottom: 24px;
-            left: 24px;
-            width: 380px;
-            background: rgba(15, 11, 28, 0.85);
-            backdrop-filter: blur(15px);
-            border: 1px solid var(--border-glow);
-            border-radius: 20px;
-            padding: 18px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-            pointer-events: auto;
-        }
-        .scatter-widget .widget-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .scatter-widget .widget-subtitle {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-bottom: 12px;
-            letter-spacing: 0.3px;
-        }
-        .scatter-canvas-wrap {
-            position: relative;
-            width: 100%;
-            height: 220px;
-        }
-
-        /* TREND MINI WIDGET (top-right below legend) */
-        .trend-widget {
-            top: 180px;
-            right: 24px;
-            width: 320px;
-            background: rgba(15, 11, 28, 0.85);
-            backdrop-filter: blur(15px);
-            border: 1px solid var(--border-glow);
-            border-radius: 16px;
-            padding: 14px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            pointer-events: auto;
-        }
-        .trend-widget .widget-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .trend-canvas-wrap {
-            position: relative;
-            width: 100%;
-            height: 120px;
-        }
-
-        /* Leaflet popup customization */
-        .leaflet-popup-content-wrapper {
-            background: rgba(15, 11, 28, 0.9) !important;
-            backdrop-filter: blur(10px);
-            color: #fff !important;
-            border: 1px solid var(--border-glow);
-            border-radius: 12px !important;
-        }
-        .leaflet-popup-tip {
-            background: rgba(15, 11, 28, 0.9) !important;
-        }
-        .popup-h {
-            font-weight: 700;
-            font-size: 13px;
-            margin-bottom: 6px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding-bottom: 4px;
-        }
-        .popup-row {
-            font-size: 11px;
-            margin-bottom: 3px;
-            display: flex;
-            justify-content: space-between;
+        @media (max-width:1100px){ .grid2,.grid2b{grid-template-columns:1fr;} .kpis{grid-template-columns:1fr 1fr;} }
+        @media (max-width:720px){
+            body{flex-direction:column;}
+            .sidebar{width:100%; height:auto; position:relative; flex-direction:row; align-items:center; padding:12px; overflow-x:auto;}
+            .brand{padding:0 12px 0 4px;} .nav{flex-direction:row;} .nav-label,.nav-foot{display:none;}
+            .main{height:auto;} .content{height:auto;}
         }
     </style>
 </head>
 <body>
-
-    <div class="glow-blob blob-1"></div>
-    <div class="glow-blob blob-2"></div>
-
-    <div class="app-container">
-        
-        <!-- SIDEBAR (Left Panel) -->
-        <div class="sidebar">
-            
-            <!-- Header -->
-            <div class="header">
-                <i class="fa-solid fa-satellite-dish" style="color: #8b5cf6; font-size: 24px;"></i>
-                <div>
-                    <h1>Surabaya EWS Pro</h1>
-                </div>
-                <span class="badge">Live</span>
-            </div>
-
-            <!-- ANOMALY ALERT BANNER (auto-hidden when no anomaly) -->
-            <div class="anomaly-banner" id="anomaly-banner">
-                <i class="fa-solid fa-radiation icon"></i>
-                <div class="text">
-                    <strong id="anomaly-count">0</strong> cluster anomali terdeteksi
-                    (z-score &ge; 2 atau growth &ge; 50%).
-                    <span style="color: var(--text-muted); font-size: 11px;">Butuh perhatian segera.</span>
-                </div>
-            </div>
-
-            <!-- Stats Grid -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <span class="label"><i class="fa-solid fa-folder-open" style="color: var(--primary);"></i> Laporan</span>
-                    <span class="value" id="stat-total">0</span>
-                    <span class="subtext">Diserap ke Delta Lake</span>
-                </div>
-                <div class="stat-card">
-                    <span class="label"><i class="fa-solid fa-triangle-exclamation" style="color: var(--color-q1);"></i> Kritis Q1/Q2</span>
-                    <span class="value" id="stat-critical">0</span>
-                    <span class="subtext">Butuh Respon Cepat</span>
-                </div>
-                <div class="stat-card">
-                    <span class="label"><i class="fa-solid fa-clock" style="color: var(--color-q4);"></i> Respon ETA</span>
-                    <span class="value" id="stat-eta">0</span>
-                    <span class="subtext">Hari (Estimasi AI)</span>
-                </div>
-                <div class="stat-card">
-                    <span class="label"><i class="fa-solid fa-map-location-dot" style="color: var(--color-q2);"></i> Area Terparah</span>
-                    <span class="value" id="stat-district" style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</span>
-                    <span class="subtext">Kecamatan Terpadat</span>
-                </div>
-            </div>
-
-            <!-- IMPORTANCE / URGENCY RATIO + GROWTH TREND -->
-            <div class="ratio-section">
-                <div class="ratio-section-title">
-                    <span><i class="fa-solid fa-gauge-high" style="color: var(--primary); margin-right: 4px;"></i> Profil Risiko Agregat</span>
-                    <span class="growth flat" id="growth-badge">tren 0%</span>
-                </div>
-                <div class="ratio-row">
-                    <div class="label-row">
-                        <span>Importance High Ratio</span>
-                        <b><span id="importance-pct">0</span>%</b>
-                    </div>
-                    <div class="ratio-bar"><div class="fill importance" id="importance-fill" style="width:0%"></div></div>
-                </div>
-                <div class="ratio-row">
-                    <div class="label-row">
-                        <span>Urgency High Ratio</span>
-                        <b><span id="urgency-pct">0</span>%</b>
-                    </div>
-                    <div class="ratio-bar"><div class="fill urgency" id="urgency-fill" style="width:0%"></div></div>
-                </div>
-            </div>
-
-            <!-- Section Title -->
-            <div class="section-title">
-                <span>Rekomendasi AI (LLM Enriched)</span>
-                <span class="pulse-indicator">
-                    <span class="dot"></span>Monitoring aktif
-                </span>
-            </div>
-
-            <!-- Insight List -->
-            <div class="insights-section" id="insights-list">
-                <!-- Cards injected here by JS -->
-            </div>
-
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="logo"><i class="fa-solid fa-satellite-dish"></i></div>
+            <div><h1>Surabaya EWS</h1><p>Pengaduan Warga</p></div>
         </div>
-
-        <!-- MAIN AREA (Right Panel) -->
-        <div class="main-content">
-            
-            <!-- Map container -->
-            <div id="map"></div>
-
-            <!-- Top bar floating controls -->
-            <div class="map-overlay top-bar">
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted);"></i>
-                    <input type="text" id="search-input" placeholder="Cari kecamatan atau bencana...">
-                </div>
-
-                <!-- Legend Card -->
-                <div class="legend-card">
-                    <div class="legend-title">Prioritas Kuadran</div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background: var(--color-q1); box-shadow: 0 0 6px var(--color-q1);"></span>
-                        <span>Q1 - Urgent & Important (Kritis)</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background: var(--color-q2); box-shadow: 0 0 6px var(--color-q2);"></span>
-                        <span>Q2 - High Important (Tinggi)</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background: var(--color-q3); box-shadow: 0 0 6px var(--color-q3);"></span>
-                        <span>Q3 - Urgent Only (Sedang)</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background: var(--color-q4); box-shadow: 0 0 6px var(--color-q4);"></span>
-                        <span>Q4 - Low Priority</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Floating charts widget (bottom right): kategori donut -->
-            <div class="map-overlay bottom-widget">
-                <div class="bottom-widget-title">
-                    <span>Sebaran Kategori Bencana</span>
-                    <i class="fa-solid fa-chart-pie" style="color: var(--primary);"></i>
-                </div>
-                <div style="width: 100%; height: 180px; position: relative;">
-                    <canvas id="category-chart"></canvas>
-                </div>
-            </div>
-
-            <!-- SCATTER 4-QUADRANT EISENHOWER (bottom-left, chart wajib) -->
-            <div class="map-overlay scatter-widget">
-                <div class="widget-title">
-                    <span><i class="fa-solid fa-braille" style="color: var(--color-q1); margin-right: 6px;"></i>Scatter 4-Kuadran Eisenhower</span>
-                    <i class="fa-solid fa-chart-scatter" style="color: var(--primary);"></i>
-                </div>
-                <div class="widget-subtitle">x = Urgency &middot; y = Importance &middot; ukuran = jumlah keluhan</div>
-                <div class="scatter-canvas-wrap">
-                    <canvas id="scatter-chart"></canvas>
-                </div>
-            </div>
-
-            <!-- TREND HARIAN per KUADRAN (top-right below legend) -->
-            <div class="map-overlay trend-widget">
-                <div class="widget-title">
-                    <span><i class="fa-solid fa-wave-square" style="color: var(--color-q4); margin-right: 4px;"></i>Tren Harian per Kuadran</span>
-                </div>
-                <div class="trend-canvas-wrap">
-                    <canvas id="trend-chart"></canvas>
-                </div>
-            </div>
-
+        <nav class="nav">
+            <span class="nav-label">Menu</span>
+            <button class="nav-item active" data-page="overview"><i class="fa-solid fa-gauge-high"></i> Overview</button>
+            <button class="nav-item" data-page="map"><i class="fa-solid fa-map-location-dot"></i> Peta Sebaran</button>
+            <button class="nav-item" data-page="analytics"><i class="fa-solid fa-chart-column"></i> Analitik</button>
+            <button class="nav-item" data-page="ai"><i class="fa-solid fa-brain"></i> Rekomendasi AI</button>
+        </nav>
+        <div class="nav-foot">
+            <button class="theme-toggle" id="theme-toggle">
+                <span id="theme-label"><i class="fa-solid fa-moon"></i> Mode Gelap</span>
+                <i class="fa-solid fa-chevron-right" style="font-size:11px;"></i>
+            </button>
         </div>
+    </aside>
 
-    </div>
+    <!-- MAIN -->
+    <div class="main">
+        <header class="topbar">
+            <div>
+                <h2 id="pg-title">Overview</h2>
+                <div class="pg-sub" id="pg-sub">Ringkasan sistem peringatan dini</div>
+            </div>
+            <div class="search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="search-input" placeholder="Cari kecamatan / kategori...">
+            </div>
+            <div class="live"><span class="dot"></span> Live · 30s</div>
+        </header>
 
-    <!-- RECOMMENDED ACTION MODAL -->
-    <div class="modal-backdrop" id="recommendation-modal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fa-solid fa-brain" style="color: #c084fc;"></i>
-                    <span id="modal-title-text">Detail & Rekomendasi Tindakan</span>
-                </div>
-                <button class="close-modal-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="modal-content-body">
-                <div>
-                    <div class="modal-section-title">Ringkasan Masalah (LLM Summary)</div>
-                    <div style="font-size: 13.5px; line-height: 1.6; color: var(--text-secondary);" id="modal-summary-text"></div>
-                </div>
-                <div>
-                    <div class="modal-section-title">Rekomendasi Tindakan Pemerintah</div>
-                    <div class="modal-recommendation-box" id="modal-rec-text"></div>
-                </div>
-                <div style="display: flex; gap: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 14px;">
-                    <div>
-                        <div class="modal-section-title">Kompleksitas</div>
-                        <div style="font-size: 13px; color: #a78bfa; font-weight: 600;" id="modal-complexity">-</div>
-                    </div>
-                    <div>
-                        <div class="modal-section-title">Estimasi Penyelesaian</div>
-                        <div style="font-size: 13px; color: #38bdf8; font-weight: 600;" id="modal-eta">-</div>
-                    </div>
-                    <div>
-                        <div class="modal-section-title">AI Provider</div>
-                        <div style="font-size: 12px; color: var(--text-muted);" id="modal-provider">-</div>
+        <div class="content" id="content">
+
+            <!-- ░░ PAGE: OVERVIEW ░░ -->
+            <section class="page active" id="page-overview">
+                <div class="card" style="margin-bottom:18px; border-left:4px solid var(--primary);">
+                    <div style="display:flex; gap:13px; align-items:flex-start;">
+                        <i class="fa-solid fa-circle-info" style="color:var(--primary); font-size:18px; margin-top:1px;"></i>
+                        <div style="font-size:13.5px; line-height:1.6; color:var(--text-soft);" id="ov-summary">Memuat ringkasan...</div>
                     </div>
                 </div>
-            </div>
+                <div class="kpis">
+                    <div class="kpi k-total">
+                        <div class="ico"><i class="fa-solid fa-inbox"></i></div>
+                        <div class="label">Total Laporan</div>
+                        <div class="value num" id="stat-total">0</div>
+                        <div class="sub">Terserap ke Delta Lake</div>
+                    </div>
+                    <div class="kpi k-crit">
+                        <div class="ico"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <div class="label">Kritis (Q1 / Q2)</div>
+                        <div class="value num" id="stat-critical">0</div>
+                        <div class="sub">Perlu respon cepat</div>
+                    </div>
+                    <div class="kpi k-eta">
+                        <div class="ico"><i class="fa-solid fa-clock"></i></div>
+                        <div class="label">Estimasi Respon</div>
+                        <div class="value num"><span id="stat-eta">0</span> <span style="font-size:15px;color:var(--text-mut)">hari</span></div>
+                        <div class="sub">Rata-rata estimasi AI</div>
+                    </div>
+                    <div class="kpi k-area">
+                        <div class="ico"><i class="fa-solid fa-location-dot"></i></div>
+                        <div class="label">Area Terparah</div>
+                        <div class="value num" id="stat-district" style="font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">-</div>
+                        <div class="sub">Kecamatan prioritas</div>
+                    </div>
+                </div>
+                <div class="grid2">
+                    <div class="card gh-360">
+                        <div class="card-head"><div class="ttl"><i class="fa-solid fa-chart-line"></i> Tren Harian per Kuadran</div><span class="hint">keluhan / hari</span></div>
+                        <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+                    </div>
+                    <div class="card gh-360">
+                        <div class="card-head"><div class="ttl"><i class="fa-solid fa-chart-pie"></i> Sebaran Kategori</div></div>
+                        <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
+                    </div>
+                </div>
+                <div class="grid2b">
+                    <div class="card">
+                        <div class="card-head"><div class="ttl"><i class="fa-solid fa-gauge-high"></i> Profil Risiko Agregat</div><span class="badge flat" id="growth-badge">tren 0%</span></div>
+                        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+                            <div class="risk-row">
+                                <div class="top"><span>Importance High Ratio</span><b><span id="importance-pct">0</span>%</b></div>
+                                <div class="bar"><div class="fill imp" id="importance-fill" style="width:0%"></div></div>
+                            </div>
+                            <div class="risk-row" style="margin-bottom:0;">
+                                <div class="top"><span>Urgency High Ratio</span><b><span id="urgency-pct">0</span>%</b></div>
+                                <div class="bar"><div class="fill urg" id="urgency-fill" style="width:0%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><div class="ttl"><i class="fa-solid fa-brain"></i> Prioritas Teratas (AI)</div><button class="badge flat" style="cursor:pointer;border:none;" onclick="goPage('ai')">Lihat semua →</button></div>
+                        <div id="ov-ai-list" style="display:flex;flex-direction:column;gap:9px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ░░ PAGE: MAP ░░ -->
+            <section class="page" id="page-map">
+                <div class="card map-page-wrap" style="padding:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+                        <div class="ttl" style="display:flex;align-items:center;gap:9px;font-weight:600;"><i class="fa-solid fa-map-location-dot" style="color:var(--primary);"></i> Peta Sebaran Prioritas <span style="font-weight:400;color:var(--text-mut);font-size:11.5px;">· warna = tingkat urgensi, ukuran = jumlah laporan</span></div>
+                        <div class="legend-inline">
+                            <span class="li"><span class="sw" style="background:#ef4444"></span> Sangat Mendesak</span>
+                            <span class="li"><span class="sw" style="background:#f97316"></span> Mendesak</span>
+                            <span class="li"><span class="sw" style="background:#eab308"></span> Cukup Mendesak</span>
+                            <span class="li"><span class="sw" style="background:#3b82f6"></span> Kurang Mendesak</span>
+                        </div>
+                    </div>
+                    <div id="map" style="flex:1;min-height:0;"></div>
+                </div>
+            </section>
+
+            <!-- ░░ PAGE: ANALYTICS ░░ -->
+            <section class="page" id="page-analytics">
+                <div class="card" style="margin-bottom:16px;">
+                    <div style="font-size:13px; line-height:1.65; color:var(--text-soft);">
+                        <b style="color:var(--text);">Matriks Eisenhower (4 Kuadran)</b> — tiap keluhan dikelompokkan dari 2 hal: seberapa <b>penting</b> (importance) & seberapa <b>mendesak</b> (urgency).<br>
+                        <span style="color:var(--q1);">● Q1 Kritis</span> = penting &amp; mendesak (tangani segera) &nbsp;·&nbsp;
+                        <span style="color:var(--q2);">● Q2 Tinggi</span> = penting, belum mendesak &nbsp;·&nbsp;
+                        <span style="color:var(--q3);">● Q3 Sedang</span> = mendesak tapi kurang penting &nbsp;·&nbsp;
+                        <span style="color:var(--q4);">● Q4 Rendah</span> = tidak keduanya.
+                    </div>
+                </div>
+                <div class="grid2">
+                    <div class="card gh-360">
+                        <div class="card-head"><div class="ttl"><i class="fa-solid fa-braille"></i> Scatter 4-Kuadran Eisenhower</div><span class="hint">x = % mendesak · y = % penting · ukuran = jumlah laporan</span></div>
+                        <div class="chart-wrap"><canvas id="scatter-chart"></canvas></div>
+                    </div>
+                    <div class="card gh-360">
+                        <div class="card-head"><div class="ttl"><i class="fa-solid fa-chart-pie"></i> Distribusi Kuadran</div></div>
+                        <div class="chart-wrap"><canvas id="quadrant-chart"></canvas></div>
+                    </div>
+                </div>
+                <div class="card gh-320">
+                    <div class="card-head"><div class="ttl"><i class="fa-solid fa-chart-column"></i> Keluhan per Kategori</div></div>
+                    <div class="chart-wrap"><canvas id="catbar-chart"></canvas></div>
+                </div>
+            </section>
+
+            <!-- ░░ PAGE: AI RECOMMENDATIONS ░░ -->
+            <section class="page" id="page-ai">
+                <div class="anomaly" id="anomaly-banner">
+                    <i class="fa-solid fa-radiation"></i>
+                    <div class="t"><strong id="anomaly-count">0</strong> cluster anomali terdeteksi (z-score ≥ 2 atau growth ≥ 50%). Butuh perhatian segera.</div>
+                </div>
+                <div class="ai-grid" id="ai-grid"></div>
+            </section>
+
         </div>
     </div>
 
-    <!-- Leaflet JS for Map -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-
     <script>
-        let map;
-        let markersGroup = [];
-        let categoryChart = null;
-        let scatterChart = null;
-        let trendChart = null;
-        let enrichedData = [];
+        // ── Palet konsisten ──────────────────────────────────────────────
+        const QCOLORS = { Q1:'#ef4444', Q2:'#f97316', Q3:'#eab308', Q4:'#3b82f6' };
+        const QLABEL  = { Q1:'Q1 Kritis', Q2:'Q2 Tinggi', Q3:'Q3 Sedang', Q4:'Q4 Rendah' };
+        const CAT_COLOR = {
+            AIR:'#2563eb', BANJIR:'#0ea5e9', LISTRIK:'#f59e0b', SAMPAH:'#10b981',
+            JALAN:'#8b5cf6', TRANSPORTASI:'#ec4899', LAINNYA:'#94a3b8'
+        };
+        const FALLBACK = ['#06b6d4','#84cc16','#d946ef','#f43f5e','#14b8a6','#a855f7'];
+        function catColor(name, i){ return CAT_COLOR[(name||'').toUpperCase()] || FALLBACK[i % FALLBACK.length]; }
+        function isDark(){ return document.documentElement.getAttribute('data-theme') === 'dark'; }
+        function tc(){ return isDark() ? {axis:'#9aa7bd', grid:'rgba(255,255,255,.08)'} : {axis:'#5b6779', grid:'rgba(31,42,61,.07)'}; }
 
-        // Inisialisasi Peta
-        function initMap() {
-            // Center map di Surabaya
-            map = L.map('map', {
-                zoomControl: false,
-                attributionControl: false
-            }).setView([-7.2575, 112.7521], 12);
-
-            // Pasang dark mode tile layer (Urbi / CartoDB Dark Matter)
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                maxZoom: 20
-            }).addTo(map);
-
-            // Taruh zoom control di pojok kanan bawah
-            L.control.zoom({
-                position: 'bottomleft'
-            }).addTo(map);
-        }
-
-        // Ambil data statistik global
-        async function fetchStats() {
-            try {
-                const res = await fetch('/api/stats');
-                const data = await res.json();
-                document.getElementById('stat-total').innerText = data.total_complaints;
-                document.getElementById('stat-critical').innerText = data.q1_q2_count;
-                document.getElementById('stat-eta').innerText = data.avg_resolution_days;
-                document.getElementById('stat-district').innerText = data.top_district;
-                document.getElementById('stat-district').title = data.top_district;
-
-                // ── Anomaly banner (tampil hanya bila ada anomali) ────────
-                const banner = document.getElementById('anomaly-banner');
-                const aCount = data.anomaly_count || 0;
-                if (aCount > 0) {
-                    document.getElementById('anomaly-count').innerText = aCount;
-                    banner.style.display = 'flex';
-                } else {
-                    banner.style.display = 'none';
-                }
-
-                // ── Importance / Urgency ratio bars ───────────────────────
-                const impPct = data.avg_importance_ratio_pct || 0;
-                const urgPct = data.avg_urgency_ratio_pct || 0;
-                document.getElementById('importance-pct').innerText = impPct;
-                document.getElementById('urgency-pct').innerText = urgPct;
-                document.getElementById('importance-fill').style.width = Math.min(100, impPct) + '%';
-                document.getElementById('urgency-fill').style.width = Math.min(100, urgPct) + '%';
-
-                // ── Growth badge (naik/turun/datar) ───────────────────────
-                const growth = data.avg_growth_rate_pct || 0;
-                const badge = document.getElementById('growth-badge');
-                badge.classList.remove('up', 'flat', 'down');
-                let badgeClass = 'flat';
-                let arrow = '→';
-                if (growth >= 10) { badgeClass = 'up'; arrow = '↑'; }
-                else if (growth <= -10) { badgeClass = 'down'; arrow = '↓'; }
-                badge.classList.add(badgeClass);
-                badge.innerText = `${arrow} tren ${growth > 0 ? '+' : ''}${growth}%`;
-            } catch (err) {
-                console.error("Gagal memuat stats:", err);
+        // Plugin: latar 4 kuadran berwarna + garis pembatas 0.5 + label pojok
+        const quadPlugin = {
+            id:'quad',
+            beforeDatasetsDraw(chart){
+                const a=chart.chartArea, sx=chart.scales.x, sy=chart.scales.y;
+                if(!a||!sx||!sy) return;
+                const ctx=chart.ctx, cx=sx.getPixelForValue(0.5), cy=sy.getPixelForValue(0.5);
+                ctx.save();
+                // Latar tiap kuadran (tint lembut)
+                ctx.fillStyle='rgba(239,68,68,0.10)';  ctx.fillRect(cx, a.top, a.right-cx, cy-a.top);      // Q1 kanan-atas
+                ctx.fillStyle='rgba(249,115,22,0.10)'; ctx.fillRect(a.left, a.top, cx-a.left, cy-a.top);   // Q2 kiri-atas
+                ctx.fillStyle='rgba(234,179,8,0.10)';  ctx.fillRect(cx, cy, a.right-cx, a.bottom-cy);      // Q3 kanan-bawah
+                ctx.fillStyle='rgba(59,130,246,0.10)'; ctx.fillRect(a.left, cy, cx-a.left, a.bottom-cy);   // Q4 kiri-bawah
+                // Garis pembatas
+                ctx.strokeStyle=tc().axis; ctx.lineWidth=1.3; ctx.setLineDash([6,4]); ctx.globalAlpha=.5;
+                ctx.beginPath(); ctx.moveTo(cx,a.top); ctx.lineTo(cx,a.bottom); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(a.left,cy); ctx.lineTo(a.right,cy); ctx.stroke();
+                ctx.setLineDash([]); ctx.globalAlpha=1;
+                // Label pojok
+                ctx.font='700 12px Inter'; const p=10;
+                ctx.fillStyle='#ef4444'; ctx.textAlign='right'; ctx.textBaseline='top';    ctx.fillText('Q1 · Kritis',  a.right-p, a.top+p);
+                ctx.fillStyle='#f97316'; ctx.textAlign='left';  ctx.textBaseline='top';    ctx.fillText('Q2 · Tinggi',  a.left+p,  a.top+p);
+                ctx.fillStyle='#eab308'; ctx.textAlign='right'; ctx.textBaseline='bottom'; ctx.fillText('Q3 · Sedang',  a.right-p, a.bottom-p);
+                ctx.fillStyle='#3b82f6'; ctx.textAlign='left';  ctx.textBaseline='bottom'; ctx.fillText('Q4 · Rendah',  a.left+p,  a.bottom-p);
+                ctx.restore();
             }
+        };
+        const PAGES = { overview:['Overview','Ringkasan sistem peringatan dini'], map:['Peta Sebaran','Distribusi prioritas per kecamatan'], analytics:['Analitik','Analisis kuadran & kategori'], ai:['Rekomendasi AI','Hasil analisis LLM untuk cluster prioritas'] };
+
+        let DATA = {}, activePage = 'overview';
+        let map=null, tileLayer=null, markers=[];
+        let cTrend=null, cCat=null, cScatter=null, cQuad=null, cBar=null;
+
+        // ── Navigation ───────────────────────────────────────────────────
+        function goPage(p){
+            activePage = p;
+            document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active', b.dataset.page===p));
+            document.querySelectorAll('.page').forEach(s=>s.classList.toggle('active', s.id==='page-'+p));
+            document.getElementById('pg-title').innerText = PAGES[p][0];
+            document.getElementById('pg-sub').innerText = PAGES[p][1];
+            renderActive();
         }
+        document.querySelectorAll('.nav-item').forEach(b=> b.addEventListener('click', ()=>goPage(b.dataset.page)) );
 
-        // Ambil data kecamatan dan gambar ke peta
-        async function fetchDistrictsOnMap() {
-            try {
-                const res = await fetch('/api/districts');
-                const districts = await res.json();
-
-                // Hapus marker lama
-                markersGroup.forEach(m => map.removeLayer(m));
-                markersGroup = [];
-
-                districts.forEach(d => {
-                    // Gambar CircleMarker dengan glow warna prioritas kuadrannya
-                    const circle = L.circleMarker(d.coords, {
-                        radius: 8 + (d.complaint_count * 0.8), // Ukuran proporsional dengan jumlah keluhan
-                        fillColor: d.color,
-                        color: d.color,
-                        weight: 1.5,
-                        opacity: 0.9,
-                        fillOpacity: 0.4
-                    }).addTo(map);
-
-                    // Custom popup detail saat diklik
-                    const popupContent = `
-                        <div class="popup-h">${d.kecamatan}</div>
-                        <div class="popup-row"><span>Total Keluhan:</span> <strong>${d.complaint_count}</strong></div>
-                        <div class="popup-row"><span>Prioritas:</span> <strong style="color:${d.color}">${d.priority_level}</strong></div>
-                        <div class="popup-row"><span>Imp Score:</span> <strong>${d.avg_importance}</strong></div>
-                        <div class="popup-row"><span>Urg Score:</span> <strong>${d.avg_urgency}</strong></div>
-                    `;
-                    circle.bindPopup(popupContent);
-                    markersGroup.push(circle);
-                    
-                    // Simpan objek Leaflet di data kecamatan agar bisa di trigger kliknya
-                    d.marker = circle;
-                });
-
-                // Simpan untuk kebutuhan pencarian/interaksi
-                window.districtsList = districts;
-
-            } catch (err) {
-                console.error("Gagal memuat data peta:", err);
-            }
+        // ── Theme ────────────────────────────────────────────────────────
+        function applyTheme(t){
+            document.documentElement.setAttribute('data-theme', t);
+            localStorage.setItem('ews-theme', t);
+            document.getElementById('theme-label').innerHTML = t==='dark'
+                ? '<i class="fa-solid fa-sun"></i> Mode Terang' : '<i class="fa-solid fa-moon"></i> Mode Gelap';
+            document.documentElement.style.setProperty('--map-filter', 'none');
+            if (map && tileLayer){ map.removeLayer(tileLayer); addTiles(); }
+            renderActive(); // recolor charts
         }
+        document.getElementById('theme-toggle').addEventListener('click', ()=> applyTheme(isDark()?'light':'dark'));
 
-        // Ambil data rekomendasi LLM (Gold-Enriched) untuk sidebar
-        async function fetchEnrichedInsights() {
-            try {
-                const res = await fetch('/api/enriched');
-                enrichedData = await res.json();
-                renderInsights(enrichedData);
-            } catch (err) {
-                console.error("Gagal memuat insight LLM:", err);
-            }
+        // ── Map ──────────────────────────────────────────────────────────
+        function addTiles(){
+            const url = isDark()
+                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+            tileLayer = L.tileLayer(url, { maxZoom:20 }).addTo(map);
         }
-
-        // Render card insights ke sidebar
-        function renderInsights(data) {
-            const listContainer = document.getElementById('insights-list');
-            listContainer.innerHTML = '';
-
-            if (data.length === 0) {
-                listContainer.innerHTML = `
-                    <div style="text-align:center; padding:40px 20px; color: var(--text-muted); font-size:13px;">
-                        <i class="fa-solid fa-spinner fa-spin" style="font-size:24px; margin-bottom:12px; color: var(--primary);"></i>
-                        <p>Menunggu data diserap dan diolah oleh LLM...</p>
-                    </div>
-                `;
-                return;
-            }
-
-            data.forEach(item => {
-                const card = document.createElement('div');
-                const quadClass = item.quadrant.toLowerCase(); // q1 or q2
-                card.className = `insight-card ${quadClass}`;
-                
-                card.innerHTML = `
-                    <div class="card-header">
-                        <span class="district-name">${item.kecamatan}</span>
-                        <span class="category-badge">${item.category}</span>
-                    </div>
-                    <div class="ai-summary">
-                        ${item.llm_summary}
-                    </div>
-                    <div class="card-footer">
-                        <div class="meta-tag complexity">
-                            <i class="fa-solid fa-gears"></i> ${item.complexity}
-                        </div>
-                        <div class="meta-tag eta">
-                            <i class="fa-solid fa-hourglass-half"></i> ${item.estimated_resolution_days} Hari
-                        </div>
-                        <button class="action-btn" onclick="openRecommendation(${item.priority_rank}, event)">Rekomendasi AI</button>
-                    </div>
-                `;
-
-                // Klik card untuk memfokuskan peta ke lokasi kecamatan
-                card.addEventListener('click', () => {
-                    focusKecamatan(item.kecamatan);
-                });
-
-                listContainer.appendChild(card);
+        function ensureMap(){
+            if (map) return;
+            map = L.map('map', { zoomControl:false, attributionControl:false }).setView([-7.2575,112.7521], 12);
+            addTiles();
+            L.control.zoom({ position:'bottomright' }).addTo(map);
+        }
+        function renderMarkers(){
+            if (!map || !DATA.districts) return;
+            markers.forEach(m=>map.removeLayer(m)); markers=[];
+            DATA.districts.forEach(d=>{
+                const color = d.color || '#64748b';
+                const radius = Math.min(34, 7 + Math.sqrt(d.complaint_count) * 2.4);
+                const c = L.circleMarker(d.coords, { radius:radius, fillColor:color, color:color, weight:2, opacity:1, fillOpacity:0.5 }).addTo(map);
+                c.bindPopup(`<div class="pop-h">${d.kecamatan}</div>
+                    <div class="pop-r"><span>Total Laporan</span><strong>${d.complaint_count}</strong></div>
+                    <div class="pop-r"><span>Prioritas Tertinggi</span><strong style="color:${color}">${d.priority_level}</strong></div>
+                    <div class="pop-r"><span>Laporan Prioritas (Q1/Q2)</span><strong>${d.priority_count}</strong></div>
+                    <div class="pop-r"><span>Importance Tinggi</span><strong>${d.importance_high_pct}%</strong></div>
+                    <div class="pop-r"><span>Urgency Tinggi</span><strong>${d.urgency_high_pct}%</strong></div>`);
+                c.kecamatan = d.kecamatan; d.marker = c; markers.push(c);
             });
         }
 
-        // Fokuskan peta ke kecamatan tertentu
-        function focusKecamatan(kecName) {
-            if (!window.districtsList) return;
-            const target = window.districtsList.find(d => d.kecamatan.toLowerCase() === kecName.toLowerCase());
-            if (target) {
-                map.setView(target.coords, 14, { animate: true });
-                target.marker.openPopup();
+        // ── KPI / risk / anomaly ─────────────────────────────────────────
+        function updateKPIs(){
+            const s = DATA.stats || {};
+            document.getElementById('stat-total').innerText = (s.total_complaints||0).toLocaleString('id-ID');
+            document.getElementById('stat-critical').innerText = (s.q1_q2_count||0).toLocaleString('id-ID');
+            document.getElementById('stat-eta').innerText = s.avg_resolution_days ?? 0;
+            const sd = document.getElementById('stat-district'); sd.innerText = s.top_district||'-'; sd.title = s.top_district||'';
+            const imp=s.avg_importance_ratio_pct||0, urg=s.avg_urgency_ratio_pct||0;
+            document.getElementById('importance-pct').innerText = imp;
+            document.getElementById('urgency-pct').innerText = urg;
+            document.getElementById('importance-fill').style.width = Math.min(100,imp)+'%';
+            document.getElementById('urgency-fill').style.width = Math.min(100,urg)+'%';
+            const g=s.avg_growth_rate_pct||0, b=document.getElementById('growth-badge');
+            b.classList.remove('up','flat','down'); let cls='flat',ar='→';
+            if(g>=10){cls='up';ar='↑';} else if(g<=-10){cls='down';ar='↓';}
+            b.classList.add(cls); b.innerText = `${ar} tren ${g>0?'+':''}${g}%`;
+            const ab=document.getElementById('anomaly-banner'), ac=s.anomaly_count||0;
+            if(ac>0){ document.getElementById('anomaly-count').innerText = ac; ab.style.display='flex'; } else ab.style.display='none';
+
+            const sum=document.getElementById('ov-summary');
+            if(sum){
+                sum.innerHTML = `Saat ini terpantau <b style="color:var(--text)">${(s.total_complaints||0).toLocaleString('id-ID')}</b> laporan warga. `
+                  + `<b style="color:var(--q1)">${(s.q1_q2_count||0).toLocaleString('id-ID')}</b> di antaranya tergolong <b>prioritas (Q1/Q2)</b> dan perlu respons cepat. `
+                  + `Area yang paling perlu perhatian: <b style="color:var(--text)">${s.top_district||'-'}</b>, dengan kategori keluhan terbanyak <b style="color:var(--text)">${s.top_category||'-'}</b>.`
+                  + (ac>0 ? ` <span style="color:var(--q1)">Terdeteksi ${ac} lonjakan tidak wajar (anomali).</span>` : ``);
             }
         }
 
-        // Buka modal rekomendasi LLM
-        function openRecommendation(rank, event) {
-            event.stopPropagation(); // Biar gak trigger focusKecamatan
-            const item = enrichedData.find(d => d.priority_rank === rank);
-            if (!item) return;
+        // ── Charts ───────────────────────────────────────────────────────
+        function legendOpts(){ return { position:'bottom', labels:{ color:tc().axis, font:{size:11,family:'Inter'}, boxWidth:9, padding:10, usePointStyle:true } }; }
 
-            document.getElementById('modal-title-text').innerText = `${item.kecamatan} - ${item.category}`;
-            document.getElementById('modal-summary-text').innerText = item.llm_summary;
-            document.getElementById('modal-rec-text').innerText = item.llm_recommendation;
-            document.getElementById('modal-complexity').innerText = item.complexity;
-            document.getElementById('modal-eta').innerText = `${item.estimated_resolution_days} Hari`;
-            document.getElementById('modal-provider').innerText = item.llm_provider.toUpperCase();
-
-            document.getElementById('recommendation-modal').classList.add('active');
+        function renderTrend(){
+            const d=DATA.trend; if(!d||!d.dates||!d.dates.length) return;
+            const ds=['Q1','Q2','Q3','Q4'].map(q=>({label:QLABEL[q], data:d.series[q].data, borderColor:QCOLORS[q], backgroundColor:QCOLORS[q]+'22', borderWidth:2, tension:.35, pointRadius:0, fill:true}));
+            if(cTrend) cTrend.destroy();
+            cTrend=new Chart(document.getElementById('trend-chart'),{ type:'line', data:{labels:d.dates,datasets:ds},
+                options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts(),tooltip:{mode:'index',intersect:false}},interaction:{mode:'nearest',axis:'x',intersect:false},
+                scales:{x:{ticks:{color:tc().axis,font:{size:10},maxTicksLimit:6},grid:{color:tc().grid}},y:{ticks:{color:tc().axis,font:{size:10}},grid:{color:tc().grid},beginAtZero:true}}}});
+        }
+        function renderCategory(){
+            const c=DATA.categories; if(!c) return;
+            if(cCat) cCat.destroy();
+            cCat=new Chart(document.getElementById('category-chart'),{ type:'doughnut',
+                data:{labels:c.map(x=>x.category), datasets:[{data:c.map(x=>x.count), backgroundColor:c.map((x,i)=>catColor(x.category,i)), borderWidth:2, borderColor:isDark()?'#161e2c':'#fff'}]},
+                options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'right',labels:{color:tc().axis,font:{size:11,family:'Inter'},boxWidth:9,padding:9,usePointStyle:true}}}}});
+        }
+        function renderScatter(){
+            const pts=DATA.scatter; if(!Array.isArray(pts)) return;
+            const byQ={Q1:[],Q2:[],Q3:[],Q4:[]};
+            pts.forEach(p=>{(byQ[p.quadrant]=byQ[p.quadrant]||[]).push({x:p.x,y:p.y,r:p.r,kecamatan:p.kecamatan,category:p.category,count:p.complaint_count});});
+            const ds=Object.keys(byQ).map(q=>({label:QLABEL[q], data:byQ[q], backgroundColor:(QCOLORS[q]||'#94a3b8')+'b3', borderColor:QCOLORS[q]||'#94a3b8', borderWidth:1.2}));
+            if(cScatter) cScatter.destroy();
+            cScatter=new Chart(document.getElementById('scatter-chart'),{ type:'bubble', data:{datasets:ds}, plugins:[quadPlugin],
+                options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts(),tooltip:{callbacks:{label:c=>{const d=c.raw;return `${d.kecamatan} / ${d.category}: ${d.count} laporan (penting ${Math.round(d.y*100)}%, mendesak ${Math.round(d.x*100)}%)`;}}}},
+                scales:{x:{title:{display:true,text:'Tingkat Mendesak / Urgency (%)',color:tc().axis,font:{size:11}},ticks:{color:tc().axis,font:{size:10},callback:v=>Math.round(v*100)+'%'},grid:{color:tc().grid},min:0,max:1},y:{title:{display:true,text:'Tingkat Penting / Importance (%)',color:tc().axis,font:{size:11}},ticks:{color:tc().axis,font:{size:10},callback:v=>Math.round(v*100)+'%'},grid:{color:tc().grid},min:0,max:1}}}});
+        }
+        function renderQuadrant(){
+            if(!Array.isArray(DATA.scatter)) return;
+            const agg={Q1:0,Q2:0,Q3:0,Q4:0};
+            DATA.scatter.forEach(p=>{ if(agg[p.quadrant]!==undefined) agg[p.quadrant]+=(p.complaint_count||0); });
+            const keys=['Q1','Q2','Q3','Q4'].filter(q=>agg[q]>0);
+            if(cQuad) cQuad.destroy();
+            cQuad=new Chart(document.getElementById('quadrant-chart'),{ type:'doughnut',
+                data:{labels:keys.map(q=>QLABEL[q]), datasets:[{data:keys.map(q=>agg[q]), backgroundColor:keys.map(q=>QCOLORS[q]), borderWidth:2, borderColor:isDark()?'#161e2c':'#fff'}]},
+                options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'right',labels:{color:tc().axis,font:{size:11,family:'Inter'},boxWidth:9,padding:9,usePointStyle:true}}}}});
+        }
+        function renderCatbar(){
+            const c=DATA.categories; if(!c) return;
+            const sorted=[...c].sort((a,b)=>b.count-a.count);
+            if(cBar) cBar.destroy();
+            cBar=new Chart(document.getElementById('catbar-chart'),{ type:'bar',
+                data:{labels:sorted.map(x=>x.category), datasets:[{data:sorted.map(x=>x.count), backgroundColor:sorted.map((x,i)=>catColor(x.category,i)), borderRadius:6, maxBarThickness:46}]},
+                options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+                scales:{x:{ticks:{color:tc().axis,font:{size:11}},grid:{display:false}},y:{ticks:{color:tc().axis,font:{size:10}},grid:{color:tc().grid},beginAtZero:true}}}});
         }
 
-        function closeModal() {
-            document.getElementById('recommendation-modal').classList.remove('active');
+        // ── AI recommendations ───────────────────────────────────────────
+        function aiCard(item){
+            const q=item.quadrant;
+            return `<div class="insight ${q.toLowerCase()}">
+                <div class="ih">
+                    <div><div class="kec">${item.kecamatan}</div><div class="rank">#${item.priority_rank} · prioritas</div></div>
+                    <span class="pill" style="background:${QCOLORS[q]||'#64748b'}">${q}</span>
+                </div>
+                <div class="meta-line">
+                    <span class="chip" style="color:${catColor(item.category,0)};border-color:${catColor(item.category,0)}33;">${item.category}</span>
+                    <span class="chip"><i class="fa-solid fa-gears"></i> ${item.complexity}</span>
+                    <span class="chip"><i class="fa-solid fa-hourglass-half"></i> ${item.estimated_resolution_days} hari</span>
+                    <span class="chip"><i class="fa-solid fa-comments"></i> ${item.complaint_count} laporan</span>
+                </div>
+                <div class="sum">${item.llm_summary||'-'}</div>
+                <div class="rec"><span class="rl"><i class="fa-solid fa-lightbulb"></i> Rekomendasi Tindakan</span>${item.llm_recommendation||'-'}</div>
+                <div class="foot"><span><i class="fa-solid fa-microchip"></i> ${(item.llm_provider||'-').toUpperCase()}</span><span class="pscore"><i class="fa-solid fa-star"></i> ${item.llm_priority_score}/10</span></div>
+            </div>`;
+        }
+        function renderAiGrid(){
+            const box=document.getElementById('ai-grid'); if(!box) return;
+            const q=(document.getElementById('search-input').value||'').toLowerCase();
+            let data=DATA.enriched||[];
+            if(q) data=data.filter(i=> i.kecamatan.toLowerCase().includes(q) || i.category.toLowerCase().includes(q) || (i.llm_summary||'').toLowerCase().includes(q));
+            if(!data.length){ box.innerHTML=`<div class="empty"><i class="fa-solid fa-spinner fa-spin"></i><p>${(DATA.enriched&&DATA.enriched.length)?'Tidak ada hasil pencarian.':'Menunggu data diolah LLM...'}</p></div>`; return; }
+            box.innerHTML = data.map(aiCard).join('');
+        }
+        function renderOvAi(){
+            const box=document.getElementById('ov-ai-list'); if(!box) return;
+            const data=(DATA.enriched||[]).slice(0,4);
+            if(!data.length){ box.innerHTML=`<div style="color:var(--text-mut);font-size:12.5px;padding:10px 0;">Menunggu data LLM...</div>`; return; }
+            box.innerHTML = data.map(i=>`<div onclick="goPage('ai')" style="display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--border);border-radius:11px;cursor:pointer;background:var(--surface-2);">
+                <span class="pill" style="background:${QCOLORS[i.quadrant]}">${i.quadrant}</span>
+                <div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13px;">${i.kecamatan}</div><div style="font-size:11px;color:var(--text-mut);">${i.category} · ${i.complexity} · ${i.estimated_resolution_days} hari</div></div>
+                <span class="pscore" style="font-size:12px;"><i class="fa-solid fa-star"></i> ${i.llm_priority_score}</span>
+            </div>`).join('');
         }
 
-        // Ambil data chart sebaran kategori
-        async function fetchCategoryChart() {
-            try {
-                const res = await fetch('/api/categories');
-                const categories = await res.json();
-
-                const labels = categories.map(c => c.category);
-                const counts = categories.map(c => c.count);
-
-                const ctx = document.getElementById('category-chart').getContext('2d');
-                
-                if (categoryChart) {
-                    categoryChart.destroy();
-                }
-
-                categoryChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            data: counts,
-                            backgroundColor: [
-                                '#ff0055', '#ff7700', '#ffcc00', '#00aaff', '#8b5cf6', '#00ffcc'
-                            ],
-                            borderWidth: 1,
-                            borderColor: '#110e20'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'right',
-                                labels: {
-                                    color: '#a19bb3',
-                                    font: { size: 10, family: 'Outfit' },
-                                    boxWidth: 8
-                                }
-                            }
-                        },
-                        cutout: '65%'
-                    }
-                });
-            } catch (err) {
-                console.error("Gagal memuat chart kategori:", err);
-            }
-        }
-
-        // ── SCATTER 4-KUADRAN EISENHOWER (chart wajib) ──────────────────────
-        async function fetchScatterChart() {
-            try {
-                const res = await fetch('/api/scatter');
-                const points = await res.json();
-                if (!Array.isArray(points)) return;
-
-                // Group by quadrant -> 1 dataset per kuadran (color per quadrant)
-                const byQ = { Q1: [], Q2: [], Q3: [], Q4: [] };
-                points.forEach(p => {
-                    if (!byQ[p.quadrant]) byQ[p.quadrant] = [];
-                    byQ[p.quadrant].push({
-                        x: p.x, y: p.y, r: p.r,
-                        kecamatan: p.kecamatan, category: p.category,
-                        count: p.complaint_count,
-                    });
-                });
-
-                const colors = { Q1: '#ff0055', Q2: '#ff7700', Q3: '#ffcc00', Q4: '#00aaff' };
-                const datasets = Object.keys(byQ).map(q => ({
-                    label: q,
-                    data: byQ[q],
-                    backgroundColor: colors[q] + '99', // 60% alpha
-                    borderColor: colors[q],
-                    borderWidth: 1.2,
-                }));
-
-                const ctx = document.getElementById('scatter-chart').getContext('2d');
-                if (scatterChart) scatterChart.destroy();
-
-                scatterChart = new Chart(ctx, {
-                    type: 'bubble',
-                    data: { datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    color: '#a19bb3',
-                                    font: { size: 10, family: 'Outfit' },
-                                    boxWidth: 10,
-                                    padding: 8,
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: (ctx) => {
-                                        const d = ctx.raw;
-                                        return `${d.kecamatan} / ${d.category} | ${d.count} laporan (urg=${d.x}, imp=${d.y})`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                title: { display: true, text: 'Urgency Score', color: '#a19bb3', font: { size: 10 } },
-                                ticks: { color: '#6e6782', font: { size: 9 } },
-                                grid: { color: 'rgba(255,255,255,0.06)' },
-                                min: 0, max: 1,
-                            },
-                            y: {
-                                title: { display: true, text: 'Importance Score', color: '#a19bb3', font: { size: 10 } },
-                                ticks: { color: '#6e6782', font: { size: 9 } },
-                                grid: { color: 'rgba(255,255,255,0.06)' },
-                                min: 0, max: 1,
-                            }
-                        }
-                    }
-                });
-            } catch (err) {
-                console.error("Gagal memuat scatter:", err);
-            }
-        }
-
-        // ── TREN HARIAN per KUADRAN ─────────────────────────────────────────
-        async function fetchTrendChart() {
-            try {
-                const res = await fetch('/api/trend');
-                const data = await res.json();
-                if (!data.dates || data.dates.length === 0) return;
-
-                const datasets = ['Q1', 'Q2', 'Q3', 'Q4'].map(q => ({
-                    label: q,
-                    data: data.series[q].data,
-                    borderColor: data.series[q].color,
-                    backgroundColor: data.series[q].color + '33',
-                    borderWidth: 1.6,
-                    tension: 0.35,
-                    pointRadius: 0,
-                    fill: false,
-                }));
-
-                const ctx = document.getElementById('trend-chart').getContext('2d');
-                if (trendChart) trendChart.destroy();
-
-                trendChart = new Chart(ctx, {
-                    type: 'line',
-                    data: { labels: data.dates, datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    color: '#a19bb3',
-                                    font: { size: 9, family: 'Outfit' },
-                                    boxWidth: 8,
-                                    padding: 6,
-                                }
-                            },
-                            tooltip: { mode: 'index', intersect: false }
-                        },
-                        interaction: { mode: 'nearest', axis: 'x', intersect: false },
-                        scales: {
-                            x: {
-                                ticks: { color: '#6e6782', font: { size: 8 }, maxTicksLimit: 5 },
-                                grid: { color: 'rgba(255,255,255,0.04)' }
-                            },
-                            y: {
-                                ticks: { color: '#6e6782', font: { size: 8 } },
-                                grid: { color: 'rgba(255,255,255,0.04)' },
-                                beginAtZero: true
-                            }
-                        }
-                    }
-                });
-            } catch (err) {
-                console.error("Gagal memuat trend:", err);
-            }
-        }
-
-        // Filter pencarian
-        document.getElementById('search-input').addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            
-            // Filter list rekomendasi di sidebar
-            const filteredInsights = enrichedData.filter(item => 
-                item.kecamatan.toLowerCase().includes(query) || 
-                item.category.toLowerCase().includes(query) ||
-                item.llm_summary.toLowerCase().includes(query)
-            );
-            renderInsights(filteredInsights);
-
-            // Filter marker di peta
-            if (window.districtsList) {
-                window.districtsList.forEach(d => {
-                    if (d.kecamatan.toLowerCase().includes(query)) {
-                        d.marker.setOpacity(0.9);
-                        d.marker.setFillOpacity(0.4);
-                    } else {
-                        d.marker.setOpacity(0.1);
-                        d.marker.setFillOpacity(0.05);
-                    }
-                });
-            }
+        // ── Search (map markers + ai grid) ───────────────────────────────
+        document.getElementById('search-input').addEventListener('input', e=>{
+            const q=e.target.value.toLowerCase();
+            renderAiGrid();
+            markers.forEach(m=>{ const match=m.kecamatan.toLowerCase().includes(q); m.setStyle({opacity:match?1:0.15, fillOpacity:match?0.45:0.05}); });
         });
 
-        // Initialize All
-        window.onload = () => {
-            initMap();
-            
-            // First load
-            fetchStats();
-            fetchDistrictsOnMap();
-            fetchEnrichedInsights();
-            fetchCategoryChart();
-            fetchScatterChart();
-            fetchTrendChart();
+        // ── Render dispatcher ────────────────────────────────────────────
+        function renderActive(){
+            if(activePage==='overview'){ renderTrend(); renderCategory(); }
+            else if(activePage==='map'){ ensureMap(); renderMarkers(); setTimeout(()=>map&&map.invalidateSize(),120); }
+            else if(activePage==='analytics'){ renderScatter(); renderQuadrant(); renderCatbar(); }
+            else if(activePage==='ai'){ renderAiGrid(); }
+        }
+        function applyData(){ updateKPIs(); renderOvAi(); renderAiGrid(); if(map) renderMarkers(); renderActive(); }
 
-            // Refresh data setiap 30 detik agar selalu live
-            setInterval(() => {
-                fetchStats();
-                fetchDistrictsOnMap();
-                fetchEnrichedInsights();
-                fetchCategoryChart();
-                fetchScatterChart();
-                fetchTrendChart();
-            }, 30000);
-        };
+        async function fetchAll(){
+            try {
+                const eps=['stats','districts','enriched','categories','scatter','trend'];
+                const res=await Promise.all(eps.map(e=>fetch('/api/'+e).then(r=>r.json()).catch(()=>null)));
+                DATA={stats:res[0],districts:res[1],enriched:res[2],categories:res[3],scatter:res[4],trend:res[5]};
+                applyData();
+            } catch(err){ console.error('fetchAll',err); }
+        }
+
+        // ── Init ─────────────────────────────────────────────────────────
+        applyTheme(localStorage.getItem('ews-theme') || 'light');
+        goPage('overview');
+        fetchAll();
+        setInterval(fetchAll, 30000);
     </script>
 </body>
 </html>

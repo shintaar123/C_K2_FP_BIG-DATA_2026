@@ -6,6 +6,8 @@ PENTING: Jaga rate limit! Jangan scraping terlalu agresif.
 Setup: buat akun X dummy, isi X_USERNAME, X_EMAIL, X_PASSWORD di .env
 """
 
+from __future__ import annotations
+
 import asyncio
 import os
 import sys

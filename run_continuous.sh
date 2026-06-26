@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script untuk menjalankan pipeline Big Data EWS secara terus-menerus tanpa Airflow
+# Script untuk menjalankan pipeline Big Data EWS secara terus-menerus (loop orkestrasi)
 
 echo "======================================================"
 echo "  Surabaya Complaint EWS - Continuous Pipeline"

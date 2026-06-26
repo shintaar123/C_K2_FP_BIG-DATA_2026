@@ -1,0 +1,27 @@
+﻿=== current main ===
+0d36456 Surabaya EWS: versi diperbaiki & dirapikan (dashboard custom multipage + dark/light, fix Superset & Grafana, pipeline Py3.8/Kafka/mlflow, hapus Airflow, HOW_TO_RUN)
+=== 0507add ada? ===
+commit
+=== riwayat lama (0507add) ===
+0507add Merge pull request #5 from shintaar123/fix/superset-chart-owners
+c155b90 fix(superset): remove PUBLIC_ROLE_LIKE + set explicit chart/dashboard owners
+d91444f Merge pull request #4 from shintaar123/fix/superset-disable-cors
+e293e8c fix(superset): disable CORS to avoid flask_cors ModuleNotFoundError
+31ce9fc Merge pull request #3 from shintaar123/fix/superset-postgres-config-and-bootstrap
+390f363 fix(superset): wire Postgres metadata DB + JWT-only bootstrap
+8204903 Merge pull request #2 from shintaar123/feat/hybrid-serving-superset-grafana-dashboard
+3fe277d feat(serving): hybrid Superset + Grafana + FastAPI custom dashboard
+23a22b0 first commit
+ba9c9c5 Add: Dashboard & AI
+d7c81e7 A5-Angga: Kurang web dashboard saja
+f8df0a6 orang angga
+=== reflog ===
+0d36456 HEAD@{0}: Branch: renamed refs/heads/clean_main to refs/heads/main
+0d36456 HEAD@{2}: commit (initial): Surabaya EWS: versi diperbaiki & dirapikan (dashboard custom multipage + dark/light, fix Superset & Grafana, pipeline Py3.8/Kafka/mlflow, hapus Airflow, HOW_TO_RUN)
+0507add HEAD@{3}: pull origin main: Fast-forward
+d91444f HEAD@{4}: pull origin main: Fast-forward
+31ce9fc HEAD@{5}: pull origin main: Fast-forward
+23a22b0 HEAD@{6}: reset: moving to HEAD
+23a22b0 HEAD@{7}: Branch: renamed refs/heads/main to refs/heads/main
+23a22b0 HEAD@{9}: commit: first commit
+ba9c9c5 HEAD@{10}: clone: from https://github.com/shintaar123/C_K2_FP_BIG-DATA_2026.git

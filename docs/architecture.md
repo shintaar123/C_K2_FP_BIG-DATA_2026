@@ -17,7 +17,7 @@ Pipeline mencakup keempat lapisan arsitektur Big Data yang lengkap:
 | **Processing** | Apache Spark | Transformasi Bronze -> Silver -> Gold + ML |
 | **Serving** | Trino + Superset + Grafana + FastAPI custom | Query SQL & visualisasi untuk pengguna akhir (lihat Section 7) |
 | **Catalog** | Hive Metastore | Katalog metadata seluruh tabel |
-| **Orchestration** | Apache Airflow | Penjadwalan pipeline harian |
+| **Orchestration** | Script loop (`run_continuous`) | Penjadwalan & loop pipeline |
 | **ML Tracking** | MLflow | Pelacakan eksperimen & versi model |
 
 ---
@@ -28,7 +28,7 @@ Pipeline mencakup keempat lapisan arsitektur Big Data yang lengkap:
 [SUMBER DATA]
   RSS Berita - X (Twitter) - Reddit - YouTube
         |
-        v  (Python scraper, dijadwalkan Airflow)
+        v  (Python scraper)
 [INGESTION]  Apache Kafka  (topik: raw-rss, raw-x, raw-reddit, raw-yt)
         |
         v  (Spark Structured Streaming)
@@ -47,7 +47,7 @@ Pipeline mencakup keempat lapisan arsitektur Big Data yang lengkap:
 
 Katalog metadata seluruh tabel: Hive Metastore
 Pelacakan model ML: MLflow
-Orkestrasi seluruh proses harian: Apache Airflow
+Orkestrasi pipeline: script run_continuous (loop) / run_pipeline
 ```
 
 Jalur ini telah diverifikasi end-to-end melalui smoke test: Spark menulis tabel Delta -> Hive mencatat metadata -> MinIO menyimpan file -> Trino membaca kembali lewat SQL standar.
@@ -79,8 +79,8 @@ Dipilih sebagai **query engine SQL terdistribusi** yang memungkinkan dashboard m
 ### Apache Superset & Grafana (Serving)
 **Superset** dipilih untuk dashboard analitik eksploratif (scatter 4-kuadran, heatmap peta kecamatan). **Grafana** dipilih untuk monitoring time-series dan **alerting visual** (panel berubah warna sesuai threshold) saat muncul keluhan prioritas tinggi (Q1). Keduanya open-source dan terhubung ke Trino sebagai sumber data. Detail lengkap & cara provisioning ada di Section 7.
 
-### Apache Airflow (Orchestration)
-Dipilih untuk **menjadwalkan dan memantau** pipeline harian (scraping 06.00, ETL 08.00, LLM 10.00, retrain mingguan). Mendukung dependency antar-tahap (DAG), retry otomatis, dan pemantauan visual. Menggunakan `LocalExecutor` untuk efisiensi resource pada skala proyek ini.
+### Orkestrasi (Script Loop)
+Orkestrasi pipeline dilakukan lewat script `run_continuous` (PowerShell/Python) yang menjalankan seluruh tahap secara berurutan (Ingestion → Bronze → Silver → Predict → Gold → LLM enrichment) lalu mengulanginya dengan jeda yang dapat dikonfigurasi. Pendekatan ini ringan, tanpa service orkestrator tambahan, dan cukup untuk skala proyek ini. Dependency antar-tahap dijaga oleh urutan eksekusi di dalam script.
 
 ### MLflow (ML Tracking)
 Dipilih untuk **melacak eksperimen model**: menyimpan metrik (F1, AUC, Precision@K), parameter, dan artefak model setiap kali pelatihan dijalankan. Memungkinkan perbandingan antar-versi model dari waktu ke waktu, bukan sekadar angka sekali jalan. Backend metadata di PostgreSQL, artefak model di MinIO.
@@ -197,7 +197,7 @@ FastAPI auto-refresh 30 detik; Superset manual atau dijadwalkan per chart).
 | Storage Format | Delta Lake (Medallion) | Minggu 10 |
 | ML Library | Spark MLlib | Minggu 6/13 |
 | ML Tracking | MLflow | Minggu 13 |
-| Orchestration | Apache Airflow | Minggu 12 |
+| Orchestration | Script loop (`run_continuous`) | Minggu 12 |
 | Data Catalog | Hive Metastore | Minggu 11 |
 | Query Engine | Trino | Minggu 14 |
 | Dashboard | Superset + Grafana (+ FastAPI custom value-add) | Minggu 14 |
@@ -218,7 +218,6 @@ Seluruh materi minggu 4-14 termanfaatkan dalam infrastruktur ini.
 | Hive Metastore | apache/hive:4.0.0 |
 | PostgreSQL | postgres:15 |
 | Trino | trinodb/trino:455 |
-| Apache Airflow | apache/airflow:2.10.3-python3.11 |
 | MLflow | ghcr.io/mlflow/mlflow:v2.17.2 |
 | Apache Superset | apache/superset:4.1.1 |
 | Grafana | grafana/grafana:11.3.0 |

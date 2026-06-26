@@ -28,7 +28,11 @@ RSS_SOURCES = [
 
 # Kafka
 import os
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+# Default kafka:9094 (listener INTERNAL) karena script ingestion ini selalu
+# dijalankan DI DALAM container (docker compose exec spark-master ...), di mana
+# 'localhost' = container itu sendiri, bukan broker Kafka. Bisa di-override
+# lewat env KAFKA_BOOTSTRAP_SERVERS kalau dijalankan dari host.
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9094")
 KAFKA_TOPIC_RSS = "raw-rss"
 
 # Keyword sederhana buat filter awal: hanya simpan artikel yang KEMUNGKINAN soal keluhan publik.
