@@ -56,14 +56,15 @@ FEATURE_FLAGS = {
 # ─── Logging ────────────────────────────────────────────────────────────────
 ENABLE_TIME_ROTATE = True
 
-# ─── CORS (untuk dashboard FastAPI custom yang akses Trino lewat browser) ───
-ENABLE_CORS = True
-CORS_OPTIONS = {
-    "supports_credentials": True,
-    "allow_headers": ["*"],
-    "resources": ["*"],
-    "origins": ["*"],
-}
+# ─── CORS ────────────────────────────────────────────────────────────────────
+# DIMATIKAN secara default karena modul flask_cors tidak terinstall di image
+# apache/superset:4.1.1 -> kalau ENABLE_CORS=True tanpa flask-cors, Superset
+# gagal start dengan "ModuleNotFoundError: No module named 'flask_cors'".
+#
+# Untuk demo Surabaya EWS, CORS tidak diperlukan (dashboard FastAPI custom
+# membaca Delta Lake langsung, bukan lewat Superset). Kalau suatu saat perlu
+# mengaktifkan, install dulu: pip install flask-cors, lalu set ENABLE_CORS=True.
+ENABLE_CORS = False
 
 # Public role (gak dipakai di demo, tapi safe default)
 PUBLIC_ROLE_LIKE = "Gamma"
