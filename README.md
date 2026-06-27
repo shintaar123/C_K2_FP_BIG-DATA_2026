@@ -220,10 +220,6 @@ python dashboard_server.py
 .\run_continuous.ps1 -IntervalSeconds 1800     # loop tiap 30 menit
 ```
 
-> *Tambahkan screenshot `docker compose ps` di `docs/img/02-docker-ps.png`*
-
-> *Tambahkan screenshot output pipeline di `docs/img/03-pipeline-selesai.png`*
-
 ---
 
 ## Akses Dashboard & Layanan
@@ -259,8 +255,6 @@ Dataset berlabel
 - Model 2 - Importance Classifier: biner (tinggi/rendah), seberapa berdampak keluhan terhadap kepentingan publik.
 - Model 3 - Urgency Classifier: biner (tinggi/rendah), seberapa mendesak keluhan perlu ditangani.
 - Anomaly Detection: Isolation Forest per grup (kecamatan x kategori) berbasis time-series Gold. Sementara flag anomali menggunakan z-score (>2 sigma) sambil menunggu histori cukup.
-
-> *Tambahkan screenshot MLflow UI di `docs/img/04-mlflow.png`*
 
 ---
 
@@ -429,8 +423,6 @@ WHERE quadrant = 'Q1'
 ORDER BY priority_rank
 LIMIT 10;
 ```
-
-> *Tambahkan screenshot Trino/Superset SQL Lab di `docs/img/10-trino-query.png`*
 
 ![Superset Dashboard](docs/img/11-superset.png)
 
