@@ -42,6 +42,8 @@ def spark_submit(packages, py_file, env_args=[]):
         "spark-master", "/opt/spark/bin/spark-submit",
         "--packages", packages,
         "--conf", "spark.jars.ivy=/tmp/.ivy",
+        "--conf", "spark.log.level=WARN",
+        "--conf", "spark.ui.showConsoleProgress=true",
         container_file
     ]
     run_command(docker_cmd)

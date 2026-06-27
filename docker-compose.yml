@@ -77,6 +77,8 @@ services:
     image: apache/spark:3.5.3
     container_name: spark-master
     user: root
+    env_file:
+      - .env
     ports:
       - "8080:8080"   # Spark Master Web UI
       - "7077:7077"   # Spark Master port (untuk worker & job)
@@ -86,7 +88,8 @@ services:
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
     command: >
-      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      bash -c "pip install -q feedparser==6.0.11 kafka-python-ng==2.2.3 requests==2.32.3 beautifulsoup4==4.12.3 python-dotenv==1.0.1 mlflow==2.17.2 boto3 urllib3==1.26.20 google-api-python-client 2>/dev/null;
+      exec /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master"
     volumes:
       - ./spark:/opt/spark/work-dir/app
       - ./data:/opt/spark/work-dir/data   # dataset berlabel untuk training & predict
@@ -94,12 +97,15 @@ services:
       - ./ingestion:/opt/spark/work-dir/ingestion
       - ./kafka:/opt/spark/work-dir/kafka
       - ./.ivy:/tmp/.ivy
+      - ./spark/log4j2.properties:/opt/spark/conf/log4j2.properties:ro
 
 
   spark-worker:
     image: apache/spark:3.5.3
     container_name: spark-worker
     user: root
+    env_file:
+      - .env
     depends_on:
       - spark-master
     environment:
@@ -108,7 +114,8 @@ services:
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
     command: >
-      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+      bash -c "pip install -q feedparser==6.0.11 kafka-python-ng==2.2.3 requests==2.32.3 beautifulsoup4==4.12.3 python-dotenv==1.0.1 mlflow==2.17.2 boto3 urllib3==1.26.20 google-api-python-client 2>/dev/null;
+      exec /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077"
     volumes:
       - ./spark:/opt/spark/work-dir/app
       - ./data:/opt/spark/work-dir/data
@@ -116,6 +123,7 @@ services:
       - ./ingestion:/opt/spark/work-dir/ingestion
       - ./kafka:/opt/spark/work-dir/kafka
       - ./.ivy:/tmp/.ivy
+      - ./spark/log4j2.properties:/opt/spark/conf/log4j2.properties:ro
   trino:
     image: trinodb/trino:455
     container_name: trino

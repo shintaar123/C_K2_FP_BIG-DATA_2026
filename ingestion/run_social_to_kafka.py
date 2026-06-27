@@ -8,6 +8,12 @@ Reddit di-skip karena diblokir Kominfo. Keduanya diganti data generate.
 import os
 import sys
 
+# ── Bersihkan output: redam warning & log INFO yang tidak penting ───────────
+import warnings, logging as _logging
+warnings.filterwarnings("ignore")
+for _n in ("kafka", "googleapiclient", "google", "google.auth", "urllib3", "botocore", "boto3", "s3transfer"):
+    _logging.getLogger(_n).setLevel(_logging.WARNING)
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "kafka"))
 

@@ -76,6 +76,8 @@ function Spark-Submit {
         "spark-master", "/opt/spark/bin/spark-submit",
         "--packages", $packages,
         "--conf", "spark.jars.ivy=/tmp/.ivy",
+        "--conf", "spark.log.level=WARN",
+        "--conf", "spark.ui.showConsoleProgress=true",
         $containerFile
     )
 
