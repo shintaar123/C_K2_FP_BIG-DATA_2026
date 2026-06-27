@@ -39,26 +39,26 @@ Lakehouse dengan pola Medallion. Orkestrasi pipeline dilakukan melalui script lo
                                  v
 +---------------------------------------------------------------------------+
 |                  INGESTION - Apache Kafka (KRaft)                         |
-|     Topic: raw-rss | raw-x | raw-reddit | raw-yt | raw-threads           |
+|     Topic: raw-rss | raw-x | raw-reddit | raw-yt | raw-threads            |
 +--------------------------------+------------------------------------------+
                                  |  Spark Structured Streaming / Batch
                                  v
 +---------------------------------------------------------------------------+
 |              BRONZE - Delta Lake @ MinIO (s3a://bronze/)                  |
-|     Data mentah, as-is, append-only, format Delta (time travel)          |
+|     Data mentah, as-is, append-only, format Delta (time travel)           |
 +--------------------------------+------------------------------------------+
                                  |  Spark Batch (silver_transform.py)
                                  v
 +---------------------------------------------------------------------------+
 |              SILVER - Delta Lake @ MinIO (s3a://silver/)                  |
-|     Teks bersih + skor awal + NER kecamatan                              |
+|     Teks bersih + skor awal + NER kecamatan                               |
 |     + ML inference (predict_batch.py) -> category/importance/urgency      |
 +--------------------------------+------------------------------------------+
                                  |  Spark Batch (gold_aggregate.py)
                                  v
 +---------------------------------------------------------------------------+
-|              GOLD - Delta Lake @ Hive Metastore (s3a://gold/)            |
-|     Agregasi harian per kecamatan & kategori + label 4-kuadran           |
+|              GOLD - Delta Lake @ Hive Metastore (s3a://gold/)             | 
+|     Agregasi harian per kecamatan & kategori + label 4-kuadran            |
 |     + LLM Enrichment (llm_enrichment.py) -> rekomendasi tindakan          |
 +--------------------------------+------------------------------------------+
                                  |  Trino SQL Engine
