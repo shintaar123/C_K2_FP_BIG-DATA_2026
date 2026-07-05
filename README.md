@@ -550,7 +550,7 @@ Fallback chain di `llm_client.py` **nyata di kode, bukan cuma di dokumentasi**: 
 
 5. **Saran konkret:**
 - perluas keyword filter atau tambah NER/klasifikasi ringan di tahap ingestion agar lebih banyak keluhan asli tertangkap
-- tambah data urgency=tinggi atau pakai class weighting
+- tambah data urgency = tinggi atau pakai class weighting
 - isi minimal satu API key LLM sebelum demo agar rekomendasi yang tampil benar-benar hasil LLM
 - jalankan pipeline penuh sekali lalu ambil bukti nyata (MLflow, Trino, dashboard) untuk melengkapi laporan.
 
