@@ -549,10 +549,10 @@ Fallback chain di `llm_client.py` **nyata di kode, bukan cuma di dokumentasi**: 
 4. **Keterbatasan utama proyek:** ±85% data latih masih sintetis. Ini bukan cuma soal jumlah data — ini rantai sebab-akibat: ingestion nyata kecil → data latih ditambal sintetis → distribusi label (terutama urgency) ikut timpang → model urgency ikut lemah.
 
 5. **Saran konkret:**
-(a) perluas keyword filter atau tambah NER/klasifikasi ringan di tahap ingestion agar lebih banyak keluhan asli tertangkap
-(b) tambah data urgency=tinggi atau pakai class weighting
-(c) isi minimal satu API key LLM sebelum demo agar rekomendasi yang tampil benar-benar hasil LLM
-(d) jalankan pipeline penuh sekali lalu ambil bukti nyata (MLflow, Trino, dashboard) untuk melengkapi laporan.
+- (a) perluas keyword filter atau tambah NER/klasifikasi ringan di tahap ingestion agar lebih banyak keluhan asli tertangkap
+- (b) tambah data urgency=tinggi atau pakai class weighting
+- (c) isi minimal satu API key LLM sebelum demo agar rekomendasi yang tampil benar-benar hasil LLM
+- (d) jalankan pipeline penuh sekali lalu ambil bukti nyata (MLflow, Trino, dashboard) untuk melengkapi laporan.
 
 ---
 ## Lampiran: Daftar Screenshot untuk Laporan
