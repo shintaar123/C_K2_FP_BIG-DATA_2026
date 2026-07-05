@@ -495,7 +495,52 @@ YOUTUBE_API_KEY=
 ```
 
 ---
+## Hasil & Analisis
 
+### 1. Ingestion
+
+Sumber yang benar-benar dikonfigurasi di `sources_config.py`: **3 RSS** (Detik Jatim, BeritaJatim, Kompas Surabaya), **2 subreddit** (r/indonesia, r/Surabaya) via keyword search, serta YouTube dan Threads. Filter relevansi masih sederhana: cek keyword literal ("pdam", "banjir", "jalan rusak", dst.) di judul/snippet sebelum masuk Bronze.
+
+**Interpretasi:** desain ini masuk akal untuk skala proyek kuliah — keyword filter murah dan cepat, tapi rawan *miss* kalau warga menulis keluhan tanpa kata kunci baku (mis. "got di depan rumah ambrol" tanpa kata "banjir"/"jalan rusak"). Data hasil scraping nyata di `data/` juga membuktikan ini: dari 3 RSS yang dikonfigurasi, cuma 2 yang benar-benar terekam (`detik_jatim` 17, `beritajatim` 10) — Kompas Surabaya tidak muncul sama sekali di dataset, kemungkinan feed-nya gagal parse atau belum sempat dijalankan.
+
+→ **Implikasi:** volume data hasil scraping nyata masih kecil (±27 baris), sehingga tim menambal dengan data sintetis (lihat poin 2) — ini konsisten antara desain ingestion dan komposisi dataset latih yang ada.
+
+### 2. Training (Machine Learning)
+
+**Dataset:** 183 sampel, 34 kecamatan. Kategori didominasi **"Lainnya" (47)**; importance seimbang (51:49), urgency timpang (**69% rendah vs 31% tinggi**). Hanya **±15% data (27 baris)** dari scraping nyata — **±85% sisanya sintetis/buatan**.
+
+**Performa model** (reproduksi lokal, metodologi identik dengan kode asli):
+
+| Model | Akurasi | F1-macro | Catatan |
+|---|---|---|---|
+| Kategori (7 kelas) | 0.81 | 0.79 | Performa terbaik |
+| Importance (biner) | 0.73 | 0.73 | Seimbang |
+| Urgency (biner) | 0.73 | **0.56** | Lemah pada kelas minoritas |
+
+**Interpretasi:** akurasi urgency terlihat oke (0.73), tapi F1-macro anjlok ke 0.56 karena model malas menebak "tinggi" — dari 12 keluhan mendesak di data uji, hanya **2 yang terdeteksi benar**. Ini akibat langsung dari ketimpangan label (69:31) yang sudah terlihat sejak tahap ingestion/labeling. Kategori kecil (Transportasi, Listrik) juga lebih sering salah klasifikasi karena datanya sedikit (masing-masing hanya 20 sampel).
+
+→ **Perbaikan tercepat:** tambah data urgency=tinggi (real atau sintetis terarah), atau aktifkan `class_weight`/`weightCol` saat training.
+
+Deteksi anomali (`train_anomaly.py`, IsolationForest vs z-score >2σ) dan priority scoring (`gold_aggregate.py`, formula kuadran Eisenhower dengan ambang 0.5) sudah terimplementasi sesuai README, tapi belum ada angka operasional nyata karena tidak ada output Gold/Delta di dalam zip.
+
+### 3. Penyajian LLM (Enrichment)
+
+`llm_enrichment.py` hanya memproses cluster kuadran **Q1 & Q2**, dibatasi **maksimum 20 cluster per run** (`MAX_CLUSTERS = 20`) — desain ini secara eksplisit membatasi biaya API dengan cara memprioritaskan keluhan paling penting/mendesak, bukan memproses semua data.
+
+Fallback chain di `llm_client.py` **nyata di kode, bukan cuma di dokumentasi**: provider dicoba berurutan (Gemini → NVIDIA NIM → Groq → Cerebras), dan setiap provider otomatis dilewati jika API key-nya kosong (`if GEMINI_API_KEY: providers.append(...)`). Ada fungsi `_rule_based()` sebagai fallback terakhir yang selalu mengembalikan rekomendasi tanpa LLM — ini yang membuat klaim "zero-crash pipeline" di README **valid secara desain**, bukan sekadar jargon.
+
+**Interpretasi:** karena `.env` tidak menyertakan API key aktif (semua kosong di `.env.example`), kemungkinan besar setiap run enrichment yang sungguh dijalankan tanpa key akan otomatis jatuh ke `_rule_based()` — artinya kualitas rekomendasi "AI" di dashboard sangat bergantung pada apakah minimal satu API key benar-benar diisi saat runtime.
+
+---
+
+## Kesimpulan
+
+1. **Ingestion** sudah berjalan untuk 2 dari 3 sumber RSS yang dikonfigurasi; filter keyword sederhana berisiko melewatkan keluhan yang tidak pakai kata kunci baku, dan volume data nyata masih kecil.
+2. **Training**: model kategori paling andal (F1-macro 0.79); model urgency lemah (F1-macro 0.56) — akar masalahnya bisa dilacak balik ke ketimpangan data sejak tahap ingestion/labeling.
+3. **LLM enrichment**: desain fallback 4-provider + rule-based terbukti solid di kode, tapi hasil akhirnya bergantung penuh pada ketersediaan API key saat runtime — tanpa key, sistem tetap jalan tapi rekomendasinya rule-based, bukan hasil LLM sungguhan.
+4. **Keterbatasan utama proyek:** ±85% data latih masih sintetis. Ini bukan cuma soal jumlah data — ini rantai sebab-akibat: ingestion nyata kecil → data latih ditambal sintetis → distribusi label (terutama urgency) ikut timpang → model urgency ikut lemah.
+5. **Saran konkret:** (a) perluas keyword filter atau tambah NER/klasifikasi ringan di tahap ingestion agar lebih banyak keluhan asli tertangkap, (b) tambah data urgency=tinggi atau pakai class weighting, (c) isi minimal satu API key LLM sebelum demo agar rekomendasi yang tampil benar-benar hasil LLM, (d) jalankan pipeline penuh sekali lalu ambil bukti nyata (MLflow, Trino, dashboard) untuk melengkapi laporan.
+---
 ## Lampiran: Daftar Screenshot untuk Laporan
 
 Simpan file gambar di folder `docs/img/` dengan nama berikut agar placeholder di README otomatis terisi:
