@@ -73,7 +73,7 @@ Pelacakan model  : MLflow (artefak di MinIO)
 Orkestrasi       : Script loop (run_continuous / run_pipeline)
 ```
 
-> *Tambahkan diagram arsitektur di `docs/img/01-arsitektur.png`*
+
 
 ---
 
