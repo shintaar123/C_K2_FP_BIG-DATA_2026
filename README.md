@@ -502,18 +502,12 @@ Simpan file gambar di folder `docs/img/` dengan nama berikut agar placeholder di
 
 | No | Nama File | Isi yang difoto |
 |---|---|---|
-| 1 | 01-arsitektur.png | Diagram arsitektur sistem |
-| 2 | 02-docker-ps.png | `docker compose ps` semua container healthy |
-| 3 | 03-pipeline-selesai.png | Terminal saat pipeline selesai (PIPELINE SELESAI) |
-| 4 | 04-mlflow.png | MLflow UI: experiment + metrik model |
 | 5 | 05-dashboard-overview.png | Dashboard custom - Overview (mode terang) |
 | 6 | 06-dashboard-peta.png | Dashboard custom - Peta Sebaran + popup kecamatan |
 | 7 | 07-dashboard-analitik.png | Dashboard custom - Analitik (scatter 4-kuadran) |
 | 8 | 08-dashboard-ai.png | Dashboard custom - Rekomendasi AI |
-| 9 | 09-dashboard-dark.png | Dashboard custom - mode gelap (opsional) |
-| 10 | 10-trino-query.png | Hasil query Gold (Trino UI / Superset SQL Lab) |
 | 11 | 11-superset.png | Superset - dashboard analitik |
 | 12 | 12-grafana.png | Grafana - dashboard monitoring |
-| 13 | 13-minio.png | MinIO Console - bucket bronze/silver/gold/mlflow |
+
 
 Disarankan menambah screenshot pendukung bila perlu: Spark UI (job berjalan), Kafka topic, serta contoh isi tabel `complaint_enriched`.
