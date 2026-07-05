@@ -501,7 +501,12 @@ YOUTUBE_API_KEY=
 
 Sumber yang benar-benar dikonfigurasi di `sources_config.py`: **3 RSS** (Detik Jatim, BeritaJatim, Kompas Surabaya), **2 subreddit** (r/indonesia, r/Surabaya) via keyword search, serta YouTube dan Threads. Filter relevansi masih sederhana: cek keyword literal ("pdam", "banjir", "jalan rusak", dst.) di judul/snippet sebelum masuk Bronze.
 
-**Interpretasi:** desain ini masuk akal untuk skala proyek kuliah — keyword filter murah dan cepat, tapi rawan *miss* kalau warga menulis keluhan tanpa kata kunci baku (mis. "got di depan rumah ambrol" tanpa kata "banjir"/"jalan rusak"). Data hasil scraping nyata di `data/` juga membuktikan ini: dari 3 RSS yang dikonfigurasi, cuma 2 yang benar-benar terekam (`detik_jatim` 17, `beritajatim` 10) — Kompas Surabaya tidak muncul sama sekali di dataset, kemungkinan feed-nya gagal parse atau belum sempat dijalankan.
+**Interpretasi:** desain ini masuk akal untuk skala proyek kuliah — keyword filter murah dan cepat, tapi rawan *miss* kalau warga menulis keluhan tanpa kata kunci baku 
+(mis. "got di depan rumah ambrol" tanpa kata "banjir"/"jalan rusak"). 
+
+Data hasil scraping nyata di `data/` juga membuktikan ini: dari 3 RSS yang dikonfigurasi, cuma 2 yang benar-benar terekam (`detik_jatim` 17, `beritajatim` 10) 
+
+Kompas Surabaya tidak muncul sama sekali di dataset, kemungkinan feed-nya gagal parse atau belum sempat dijalankan.
 
 → **Implikasi:** volume data hasil scraping nyata masih kecil (±27 baris), sehingga tim menambal dengan data sintetis (lihat poin 2) — ini konsisten antara desain ingestion dan komposisi dataset latih yang ada.
 
