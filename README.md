@@ -567,6 +567,3 @@ Simpan file gambar di folder `docs/img/` dengan nama berikut agar placeholder di
 | 8 | 08-dashboard-ai.png | Dashboard custom - Rekomendasi AI |
 | 11 | 11-superset.png | Superset - dashboard analitik |
 | 12 | 12-grafana.png | Grafana - dashboard monitoring |
-
-
-Disarankan menambah screenshot pendukung bila perlu: Spark UI (job berjalan), Kafka topic, serta contoh isi tabel `complaint_enriched`.
